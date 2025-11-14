@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Save, X, RefreshCw, CheckCircle, AlertCircle, Settings, Brain, Zap } from 'lucide-react';
+
+export default function AIAdminPanel() {
+  const [aiSources, setAISources] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [testing, setTesting] = useState(null);
+  const [newSource, setNewSource] = useState({
+    name: '',
+    provider: 'custom',
+    apiKey: '',
+    endpoint: '',
+    model: '',
+    enabled: true,
+    priority: 1
+  });
+
+  // Load AI sources dari server
+  useEffect(() => {
+    loadAISources();
+  }, []);
+
+  const loadAISources = async () => {
+    try {
+      const response = await fetch('/api/admin/sources');
+      const data = await response.json();
+      setAISources(data.sources || getDefaultSources());
+    } catch (error) {
+      console.error('Failed to load sources:', error);
+      setAISources(getDefaultSources());
+    }
+  };
+
+  const getDefaultSources = () => [
+    {
+      id: 'groq-llama',
+      name: 'Groq (Llama 3.2 90B)',
+      provider: 'groq',
+      model: 'llama-3.2-90b-vision-preview',
+      apiKey: '***',
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      enabled: true,
+      priority: 1,
+      status: 'active',
+      description: 'Super cepat, gratis, excellent untuk coding'
+    },
+    {
+      id: 'openrouter-gpt4',
+      name: 'OpenRouter (GPT-4)',
+      provider: 'openrouter',
+      model: 'openai/gpt-4',
+      apiKey: '***',
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      enabled: true,
+      priority: 2,
+      status: 'active',
+      description: 'Best quality, comprehensive answers'
+    },
+    {
+      id: 'openrouter-claude',
+      name: 'OpenRouter (Claude 3.5)',
+      provider: 'openrouter',
+      model: 'anthropic/claude-3.5-sonnet',
+      apiKey: '***',
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      enabled: true,
+      priority: 3,
+      status: 'active',
+      description: 'Excellent reasoning, good for analysis'
+    },
+    {
+      id: 'huggingface-llama',
+      name: 'HuggingFace (Llama 3.2 3B)',
+      provider: 'huggingface',
+      model: 'meta-llama/Llama-3.2-3B-Instruct',
+      apiKey: '***',
+      endpoint: 'https://api-inference.huggingface.co/models/',
+      enabled: false,
+      priority: 4,
+      status: 'inactive',
+      description: 'Lightweight, free tier available'
+    }
+  ];
+
+  const saveAISources = async () => {
+    try {
+      await fetch('/api/admin/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sources: aiSources })
+      });
+      alert('✅ AI sources saved successfully!');
+    } catch (error) {
+      console.error('Failed to save:', error);
+      alert('❌ Failed to save sources');
+    }
+  };
+
+  const addNewSource = () => {
+    if (!newSource.name || !newSource.endpoint) {
+      alert('Name and endpoint are required!');
+      return;
+    }
+
+    const source = {
+      ...newSource,
+      id: `custom-${Date.now()}`,
+      status: 'inactive'
+    };
+
+    setAISources([...aiSources, source]);
+    setNewSource({
+      name: '',
+      provider: 'custom',
+      apiKey: '',
+      endpoint: '',
+      model: '',
+      enabled: true,
+      priority: aiSources.length + 1
+    });
+    setAdding(false);
+  };
+
+  const deleteSource = (id) => {
+    if (confirm('Delete this AI source?')) {
+      setAISources(aiSources.filter(s => s.id !== id));
+    }
+  };
+
+  const toggleSource = (id) => {
+    setAISources(aiSources.map(s => 
+      s.id === id ? { ...s, enabled: !s.enabled } : s
+    ));
+  };
+
+  const testSource = async (source) => {
+    setTesting(source.id);
+    
+    try {
+      const response = await fetch('/api/admin/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ Test successful!\n\nResponse: ${result.response.substring(0, 100)}...`);
+        setAISources(aiSources.map(s => 
+          s.id === source.id ? { ...s, status: 'active' } : s
+        ));
+      } else {
+        alert(`❌ Test failed: ${result.error}`);
+        setAISources(aiSources.map(s => 
+          s.id === source.id ? { ...s, status: 'error' } : s
+        ));
+      }
+    } catch (error) {
+      alert(`❌ Test failed: ${error.message}`);
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const providerTemplates = {
+    groq: {
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      models: ['llama-3.2-90b-vision-preview', 'llama-3.2-11b-vision-preview', 'mixtral-8x7b-32768']
+    },
+    openrouter: {
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      models: ['openai/gpt-4', 'anthropic/claude-3.5-sonnet', 'google/gemini-pro', 'meta-llama/llama-3.2-90b-instruct']
+    },
+    huggingface: {
+      endpoint: 'https://api-inference.huggingface.co/models/',
+      models: ['meta-llama/Llama-3.2-3B-Instruct', 'mistralai/Mistral-7B-Instruct-v0.2']
+    },
+    openai: {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      models: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']
+    },
+    anthropic: {
+      endpoint: 'https://api.anthropic.com/v1/messages',
+      models: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229']
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Settings className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">AI Learning Sources Manager</h1>
+                <p className="text-sm text-gray-500">Configure AI yang digunakan untuk pembelajaran</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={saveAISources}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Save Changes
+              </button>
+              <button
+                onClick={() => setAdding(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add AI Source
+              </button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mt-6">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-600">{aiSources.length}</div>
+              <div className="text-sm text-gray-600">Total Sources</div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-green-600">
+                {aiSources.filter(s => s.enabled).length}
+              </div>
+              <div className="text-sm text-gray-600">Active</div>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-amber-600">
+                {aiSources.filter(s => !s.enabled).length}
+              </div>
+              <div className="text-sm text-gray-600">Disabled</div>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-purple-600">
+                {new Set(aiSources.map(s => s.provider)).size}
+              </div>
+              <div className="text-sm text-gray-600">Providers</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Add New Source Form */}
+        {adding && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800">Add New AI Source</h2>
+              <button
+                onClick={() => setAdding(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Source Name
+                </label>
+                <input
+                  type="text"
+                  value={newSource.name}
+                  onChange={(e) => setNewSource({...newSource, name: e.target.value})}
+                  placeholder="e.g., My Custom AI"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Provider
+                </label>
+                <select
+                  value={newSource.provider}
+                  onChange={(e) => {
+                    const provider = e.target.value;
+                    const template = providerTemplates[provider];
+                    setNewSource({
+                      ...newSource, 
+                      provider,
+                      endpoint: template?.endpoint || '',
+                      model: template?.models?.[0] || ''
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="custom">Custom</option>
+                  <option value="groq">Groq</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="huggingface">HuggingFace</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API Endpoint
+                </label>
+                <input
+                  type="text"
+                  value={newSource.endpoint}
+                  onChange={(e) => setNewSource({...newSource, endpoint: e.target.value})}
+                  placeholder="https://api.example.com/v1/chat"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Model Name
+                </label>
+                <input
+                  type="text"
+                  value={newSource.model}
+                  onChange={(e) => setNewSource({...newSource, model: e.target.value})}
+                  placeholder="e.g., gpt-4"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  value={newSource.apiKey}
+                  onChange={(e) => setNewSource({...newSource, apiKey: e.target.value})}
+                  placeholder="sk-..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority (1-10)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={newSource.priority}
+                  onChange={(e) => setNewSource({...newSource, priority: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newSource.enabled}
+                    onChange={(e) => setNewSource({...newSource, enabled: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Enable immediately</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setAdding(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addNewSource}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Add Source
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* AI Sources List */}
+        <div className="space-y-4">
+          {aiSources.map((source) => (
+            <div
+              key={source.id}
+              className={`bg-white rounded-xl shadow-md p-6 transition-all ${
+                !source.enabled ? 'opacity-60' : ''
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4 flex-1">
+                  {/* Toggle Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={source.enabled}
+                      onChange={() => toggleSource(source.id)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+
+                  {/* Info */}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-bold text-gray-800">{source.name}</h3>
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                        {source.provider}
+                      </span>
+                      {source.status === 'active' && (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      )}
+                      {source.status === 'error' && (
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                      )}
+                      <span className="text-sm text-gray-500">Priority: {source.priority}</span>
+                    </div>
+
+                    {source.description && (
+                      <p className="text-sm text-gray-600 mb-3">{source.description}</p>
+                    )}
+
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Brain className="w-4 h-4" />
+                        <span>Model: {source.model}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Zap className="w-4 h-4" />
+                        <span>Endpoint: {source.endpoint.substring(0, 40)}...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => testSource(source)}
+                    disabled={testing === source.id}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Test Connection"
+                  >
+                    {testing === source.id ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setEditing(source.id)}
+                    className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                    title="Edit"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => deleteSource(source.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {aiSources.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Brain className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">No AI Sources Yet</h3>
+            <p className="text-gray-600 mb-4">Add your first AI source to start learning!</p>
+            <button
+              onClick={() => setAdding(true)}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Add AI Source
+            </button>
+          </div>
+        )}
+
+        {/* Instructions */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6">
+          <h3 className="text-lg font-bold text-blue-900 mb-3">💡 How to Use</h3>
+          <ul className="space-y-2 text-sm text-blue-800">
+            <li>• <strong>Toggle Switch</strong>: Enable/disable AI sources</li>
+            <li>• <strong>Priority</strong>: Lower number = higher priority (1 is highest)</li>
+            <li>• <strong>Test Button</strong>: Verify connection and API key</li>
+            <li>• <strong>Save Changes</strong>: Don't forget to save after modifications!</li>
+            <li>• <strong>Multiple Sources</strong>: AI will query all enabled sources and learn from them</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+  </script>
+</body>
+</html>
