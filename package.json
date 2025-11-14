@@ -1,0 +1,11 @@
+{
+  "name": "self-learning-ai",
+  "version": "1.0.0",
+  "description": "AI that learns from other AIs",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
