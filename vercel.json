@@ -1,19 +1,24 @@
 {
   "version": 2,
-  "rewrites": [
+  "routes": [
     {
-      "source": "/",
-      "destination": "/public/index.html"
+      "src": "/admin",
+      "dest": "/admin.html"
     },
     {
-      "source": "/admin",
-      "destination": "/public/admin.html"
+      "src": "/",
+      "dest": "/index.html"
     }
   ],
-  "functions": {
-    "api/**/*.js": {
-      "memory": 1024,
-      "maxDuration": 30
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
     }
-  }
+  ]
 }
