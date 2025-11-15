@@ -1,13 +1,12 @@
-// NextGenAI - Main Application with Artifacts System
-// Complete implementation with code generation capabilities
+// NextGenAI - FIXED VERSION
+// Proper artifact parsing, responsive design, hidden admin access
 
-// State Management
 let currentTab = 'chat';
 let messages = [];
 let isLoading = false;
 let aiSources = [];
 let enabledTools = {
-  artifacts: true, // Always enabled
+  artifacts: true,
   websearch: false,
   coderun: false,
   imagegen: false,
@@ -18,13 +17,11 @@ let uploadedFile = null;
 let uploadedFileData = null;
 let artifactCount = 0;
 
-// Initialize
 function init() {
   loadSources();
   loadToolsState();
   updateActiveToolsDisplay();
   
-  // Check if admin configured
   if (aiSources.length === 0 || !aiSources.some(s => s.apiKey)) {
     showAdminWarning();
   }
@@ -36,13 +33,12 @@ function showAdminWarning() {
   banner.innerHTML = `
     <p class="text-sm text-amber-800">
       <strong>⚠️ Configuration Required:</strong> No AI sources configured. 
-      <a href="/admin.html" class="underline font-semibold">Click here to setup in Admin Panel</a>
+      Please contact your administrator to setup the system.
     </p>
   `;
   document.getElementById('messages').appendChild(banner);
 }
 
-// Load from localStorage (set by admin panel)
 function loadSources() {
   const saved = localStorage.getItem('ai_sources');
   if (saved) {
@@ -61,21 +57,19 @@ function loadToolsState() {
   }
 }
 
-// Tab Management
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.getElementById(`content-${tab}`).classList.add('active');
   
   document.querySelectorAll('[id^="tab-"]').forEach(el => {
-    el.className = 'px-6 py-3 font-medium border-b-2 border-transparent text-gray-600 hover:text-purple-600';
+    el.className = 'px-4 sm:px-6 py-3 text-sm sm:text-base font-medium border-b-2 border-transparent text-gray-600 hover:text-purple-600';
   });
-  document.getElementById(`tab-${tab}`).className = 'px-6 py-3 font-medium border-b-2 border-purple-500 text-purple-600';
+  document.getElementById(`tab-${tab}`).className = 'px-4 sm:px-6 py-3 text-sm sm:text-base font-medium border-b-2 border-purple-500 text-purple-600';
 }
 
-// Tool Management
 function toggleTool(toolId) {
-  if (toolId === 'artifacts') return; // Always enabled
+  if (toolId === 'artifacts') return;
   const checkbox = document.getElementById(`tool-${toolId}`);
   checkbox.checked = !checkbox.checked;
   updateToolStatus();
@@ -121,7 +115,6 @@ function updateActiveToolsDisplay() {
   }
 }
 
-// Message Management
 function addMessage(role, content, options = {}) {
   messages.push({ role, content });
   const container = document.getElementById('messages');
@@ -137,25 +130,25 @@ function addMessage(role, content, options = {}) {
   if (options.artifact) {
     msg.innerHTML = `
       ${avatar}
-      <div class="flex-1">
+      <div class="flex-1 min-w-0">
         ${renderArtifact(options.artifact)}
       </div>
     `;
   } else if (options.html) {
     msg.innerHTML = `
       ${avatar}
-      <div class="flex-1">
+      <div class="flex-1 min-w-0">
         <div class="px-4 py-3 rounded-2xl ${bgColor} shadow-sm border">
-          <div class="message-content">${content}</div>
+          <div class="message-content text-sm sm:text-base">${content}</div>
         </div>
       </div>
     `;
   } else {
     msg.innerHTML = `
       ${avatar}
-      <div class="flex-1">
+      <div class="flex-1 min-w-0">
         <div class="px-4 py-3 rounded-2xl ${bgColor} text-gray-800 shadow-sm border">
-          <p class="leading-relaxed message-content">${escapeHtml(content)}</p>
+          <p class="leading-relaxed message-content text-sm sm:text-base">${escapeHtml(content)}</p>
         </div>
       </div>
     `;
@@ -165,7 +158,6 @@ function addMessage(role, content, options = {}) {
   scrollToBottom();
 }
 
-// Artifact System
 function renderArtifact(artifact) {
   artifactCount++;
   const artifactId = `artifact-${artifactCount}`;
@@ -173,7 +165,6 @@ function renderArtifact(artifact) {
   let previewContent = '';
   let codeView = `<div class="artifact-code">${escapeHtml(artifact.code)}</div>`;
   
-  // Generate preview based on type
   if (artifact.type === 'html' || artifact.type === 'react') {
     previewContent = `
       <iframe 
@@ -188,20 +179,20 @@ function renderArtifact(artifact) {
   } else if (artifact.type === 'markdown') {
     previewContent = `<div class="p-4 prose max-w-none">${marked.parse(artifact.code)}</div>`;
   } else {
-    previewContent = `<div class="p-4 text-gray-600">No preview available for ${artifact.type}</div>`;
+    previewContent = `<div class="p-4 text-gray-600 text-sm">No preview available for ${artifact.type}</div>`;
   }
   
   return `
     <div class="artifact-container">
       <div class="artifact-header">
-        <div class="flex items-center gap-3">
+        <div class="artifact-header-left">
           <span class="text-2xl">🎨</span>
           <div>
-            <h3 class="text-white font-semibold">${artifact.title}</h3>
+            <h3 class="text-white font-semibold text-sm sm:text-base">${artifact.title}</h3>
             <p class="text-purple-200 text-xs">${artifact.type.toUpperCase()} • ${artifact.language || 'Mixed'}</p>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="artifact-header-right">
           <button onclick="copyArtifact('${artifactId}')" class="artifact-button bg-white text-purple-600 hover:bg-purple-50">
             📋 Copy
           </button>
@@ -237,12 +228,10 @@ function renderArtifact(artifact) {
 }
 
 function switchArtifactTab(artifactId, tab) {
-  // Update tab buttons
   const container = document.querySelector(`#${artifactId}-preview-tab`).parentElement.parentElement;
   container.querySelectorAll('.artifact-tab').forEach(t => t.classList.remove('active'));
   container.querySelector(`.artifact-tab:nth-child(${tab === 'preview' ? 1 : 2})`).classList.add('active');
   
-  // Show/hide content
   document.getElementById(`${artifactId}-preview-tab`).classList.toggle('hidden', tab !== 'preview');
   document.getElementById(`${artifactId}-code-tab`).classList.toggle('hidden', tab !== 'code');
 }
@@ -287,7 +276,7 @@ function clearChat() {
         </div>
         <div class="flex-1">
           <div class="px-4 py-3 rounded-2xl bg-white text-gray-800 shadow-sm border border-purple-100">
-            <p class="leading-relaxed">Chat cleared! Ready to create something amazing? 🚀</p>
+            <p class="leading-relaxed text-sm sm:text-base">Chat cleared! Ready to create something amazing? 🚀</p>
           </div>
         </div>
       </div>
@@ -328,7 +317,6 @@ function hideLoading() {
   document.getElementById('statusText').textContent = 'Ready';
 }
 
-// File Upload
 function showFileUpload() {
   document.getElementById('fileInput').click();
 }
@@ -342,12 +330,6 @@ async function handleFileUpload(event) {
   reader.onload = async (e) => {
     uploadedFileData = e.target.result;
     addMessage('user', `📎 Uploaded: ${file.name}`);
-    
-    if (file.type.startsWith('image/') && enabledTools.imageanalyze) {
-      await processImageAnalysis(file, uploadedFileData);
-    } else if (file.name.endsWith('.csv') && enabledTools.dataanalyze) {
-      await processCSVAnalysis(file);
-    }
   };
   
   if (file.type.startsWith('image/')) {
@@ -357,7 +339,6 @@ async function handleFileUpload(event) {
   }
 }
 
-// Main Chat Function
 async function sendMessage() {
   if (isLoading) return;
   const input = document.getElementById('userInput');
@@ -374,7 +355,6 @@ async function sendMessage() {
       throw new Error('NO_AI_CONFIGURED');
     }
 
-    // Detect if user wants an artifact
     const wantsArtifact = detectArtifactIntent(question);
     
     if (wantsArtifact) {
@@ -382,13 +362,14 @@ async function sendMessage() {
       hideLoading();
       
       if (result.artifact) {
-        addMessage('assistant', result.explanation);
+        if (result.explanation) {
+          addMessage('assistant', result.explanation);
+        }
         addMessage('assistant', '', { artifact: result.artifact });
       } else {
-        addMessage('assistant', result.answer);
+        addMessage('assistant', result.answer || 'Failed to generate artifact. Please try again with more specific instructions.');
       }
     } else {
-      // Regular chat
       const result = await queryAI(aiSources, question);
       hideLoading();
       addMessage('assistant', result.answer);
@@ -397,61 +378,55 @@ async function sendMessage() {
     hideLoading();
     let errorMsg = '😔 Sorry, I encountered an error. Please try again.';
     if (error.message === 'NO_AI_CONFIGURED') {
-      errorMsg = '🔧 No AI sources configured. Please <a href="/admin.html" class="underline font-bold">setup in Admin Panel</a>.';
-      addMessage('assistant', errorMsg, { html: true });
-    } else {
-      addMessage('assistant', errorMsg);
+      errorMsg = '🔧 System not configured. Please contact administrator.';
     }
+    addMessage('assistant', errorMsg);
   } finally {
     isLoading = false;
   }
 }
 
-// Detect if user wants an artifact
 function detectArtifactIntent(text) {
   const artifactKeywords = [
     'create', 'build', 'make', 'generate', 'buat', 'bikin',
     'website', 'app', 'application', 'component', 'page',
     'html', 'css', 'javascript', 'react', 'code',
     'calculator', 'game', 'form', 'dashboard', 'chart',
-    'timer', 'clock', 'counter', 'animation'
+    'timer', 'clock', 'counter', 'animation', 'button'
   ];
   
   const lowerText = text.toLowerCase();
   return artifactKeywords.some(kw => lowerText.includes(kw));
 }
 
-// Generate Artifact with AI
 async function generateArtifact(prompt, sources) {
-  const systemPrompt = {
-    role: 'system',
-    content: `You are NextGenAI, an expert code generator. When user asks to create something, you MUST:
+  const systemPrompt = `You are an expert code generator. Generate COMPLETE, WORKING code based on user requests.
 
-1. Generate complete, working code
-2. Respond in this EXACT JSON format:
+CRITICAL RULES:
+1. ALWAYS respond with ONLY valid JSON in this exact format:
 {
   "explanation": "Brief explanation of what you created",
   "artifact": {
     "title": "Project Name",
-    "type": "html|react|svg|markdown",
-    "language": "html|javascript|python",
+    "type": "html",
+    "language": "html",
     "code": "COMPLETE WORKING CODE HERE"
   }
 }
 
-3. Code MUST be:
-   - Complete and functional
-   - Include all necessary HTML, CSS, JavaScript in single file
-   - Use CDN for external libraries if needed
-   - No placeholders or TODO comments
-   - Production-ready quality
+2. Code MUST be:
+   - Complete and functional (no placeholders)
+   - Self-contained (all CSS/JS inline for HTML)
+   - Production-ready
+   - Beautiful with modern design
+   - Use Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
 
-4. For HTML: Include <!DOCTYPE html>, all tags, inline CSS/JS
-5. For React: Create complete functional component with all imports
-6. Make it beautiful with modern design (Tailwind if possible via CDN)
+3. NO markdown formatting, NO backticks, ONLY JSON
 
-ALWAYS respond with valid JSON only. No markdown, no extra text.`
-  };
+4. For HTML: Include <!DOCTYPE html>, complete structure, inline styles/scripts
+
+Example response:
+{"explanation":"Created a calculator","artifact":{"title":"Calculator","type":"html","language":"html","code":"<!DOCTYPE html><html>..."}}`;
 
   for (const source of sources) {
     try {
@@ -464,7 +439,7 @@ ALWAYS respond with valid JSON only. No markdown, no extra text.`
         body: JSON.stringify({
           model: source.model,
           messages: [
-            systemPrompt,
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
@@ -475,16 +450,26 @@ ALWAYS respond with valid JSON only. No markdown, no extra text.`
       if (!response.ok) continue;
       
       const data = await response.json();
-      let content = data.choices[0].message.content;
+      let content = data.choices[0].message.content.trim();
       
       // Clean up response
-      content = content.replace(/```json\n?/g, '').replace(/```\n?$/g, '').trim();
+      content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+      
+      // Remove any leading/trailing text before/after JSON
+      const jsonStart = content.indexOf('{');
+      const jsonEnd = content.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        content = content.substring(jsonStart, jsonEnd + 1);
+      }
       
       try {
         const parsed = JSON.parse(content);
-        return parsed;
+        if (parsed.artifact && parsed.artifact.code) {
+          return parsed;
+        }
       } catch (e) {
-        // If not JSON, treat as code directly
+        console.error('JSON parse error:', e);
+        // If not valid JSON, try to extract code and create artifact manually
         return {
           explanation: "I've created what you requested:",
           artifact: {
@@ -501,19 +486,13 @@ ALWAYS respond with valid JSON only. No markdown, no extra text.`
     }
   }
   
-  return { answer: "Failed to generate artifact. Please try again." };
+  return { answer: "Failed to generate artifact. Please try again with clearer instructions." };
 }
 
-// Regular AI Query
 async function queryAI(sources, question) {
-  const systemPrompt = {
-    role: 'system',
-    content: `You are NextGenAI, an advanced AI assistant with artifact generation capabilities.
+  const systemPrompt = `You are NextGenAI, a helpful AI assistant.
 
-ENABLED TOOLS: ${Object.entries(enabledTools).filter(([_, v]) => v).map(([k]) => k).join(', ')}
-
-Be helpful, professional, and concise. If user wants to create something, suggest they use phrases like "create", "build", or "generate".`
-  };
+Be concise, professional, and helpful. If user wants to create something, suggest using phrases like "create", "build", or "make".`;
 
   for (const source of sources) {
     try {
@@ -526,7 +505,7 @@ Be helpful, professional, and concise. If user wants to create something, sugges
         body: JSON.stringify({
           model: source.model,
           messages: [
-            systemPrompt,
+            { role: 'system', content: systemPrompt },
             ...messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
           ],
           temperature: 0.7,
@@ -547,20 +526,10 @@ Be helpful, professional, and concise. If user wants to create something, sugges
   throw new Error('All AI sources failed');
 }
 
-// Helper Functions
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-async function processImageAnalysis(file, imageData) {
-  // Implementation from previous version
-}
-
-async function processCSVAnalysis(file) {
-  // Implementation from previous version
-}
-
-// Initialize on load
 window.addEventListener('DOMContentLoaded', init);
