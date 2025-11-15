@@ -3,169 +3,347 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Self-Learning AI - Gratis & Unlimited</title>
+  <title>AI Assistant - Your Personal AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
 </head>
 <body class="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
   
-  <!-- Main Chat Interface -->
-  <div class="flex flex-col h-screen">
-    
-    <!-- Header -->
-    <div class="bg-white border-b border-purple-200 shadow-sm">
-      <div class="max-w-4xl mx-auto px-4 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
-              <span class="text-2xl">🧠</span>
-            </div>
-            <div>
-              <h1 class="text-xl font-bold text-gray-800">Self-Learning AI</h1>
-              <p class="text-xs text-gray-500">Belajar dari Multiple AI</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button onclick="clearChat()" class="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Hapus chat">
-              🗑️ Clear
-            </button>
-            <button onclick="toggleMode()" id="modeBtn" class="px-3 py-2 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors" title="Toggle mode">
-              🧠 Smart
-            </button>
-          </div>
-        </div>
-
-        <!-- Mode Info -->
-        <div id="modeInfo" class="mt-3 text-xs bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-purple-700">
-          <strong>Smart Mode:</strong> AI belajar dari berbagai sumber untuk hasil terbaik (lebih lambat tapi lebih komprehensif)
-        </div>
+  <!-- Navigation Tabs -->
+  <div class="bg-white shadow-sm border-b">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="flex gap-1">
+        <button onclick="switchTab('chat')" id="tab-chat" class="px-6 py-3 font-medium border-b-2 border-purple-500 text-purple-600">
+          💬 Assistant
+        </button>
+        <button onclick="switchTab('admin')" id="tab-admin" class="px-6 py-3 font-medium border-b-2 border-transparent text-gray-600 hover:text-purple-600">
+          ⚙️ Configuration
+        </button>
       </div>
     </div>
-
-    <!-- Messages -->
-    <div id="messagesContainer" class="flex-1 overflow-y-auto">
-      <div class="max-w-4xl mx-auto px-4 py-6 space-y-6" id="messages">
-        <!-- Welcome message -->
-        <div class="flex gap-3">
-          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0">
-            <span class="text-white">🧠</span>
-          </div>
-          <div class="flex-1 space-y-2">
-            <div class="px-4 py-3 rounded-2xl bg-white text-gray-800 shadow-sm border border-purple-100">
-              <p class="leading-relaxed">
-                🎉 <strong>Selamat datang!</strong><br><br>
-                Saya adalah AI yang belajar dari berbagai AI (Llama, GPT, Claude, dll) untuk memberikan jawaban terbaik.<br><br>
-                ✨ <strong>Kelebihan:</strong><br>
-                • Gratis & Unlimited<br>
-                • Tidak perlu setup API key<br>
-                • Auto-fallback jika 1 AI error<br>
-                • Belajar dari multiple perspectives<br><br>
-                Tanyakan apa saja! 🚀
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Input -->
-    <div class="bg-white border-t border-purple-200 shadow-lg">
-      <div class="max-w-4xl mx-auto px-4 py-4">
-        <div class="flex gap-3">
-          <textarea
-            id="userInput"
-            placeholder="Tanyakan apa saja... (Ctrl+Enter untuk kirim)"
-            class="flex-1 px-4 py-3 border border-purple-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            rows="1"
-            onkeydown="handleKeyPress(event)"
-          ></textarea>
-          <button
-            onclick="sendMessage()"
-            id="sendBtn"
-            class="px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all disabled:opacity-50"
-          >
-            <span id="sendIcon">📤</span>
-          </button>
-        </div>
-        <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
-          <span>AI siap membantu • Enter atau Ctrl+Enter untuk kirim</span>
-          <span id="statusText">Ready</span>
-        </div>
-      </div>
-    </div>
-
   </div>
 
-  <script>
-    let messages = [];
-    let isLoading = false;
-    let currentMode = 'smart'; // 'smart' or 'fast'
-
-    // Auto-scroll to bottom
-    function scrollToBottom() {
-      const container = document.getElementById('messagesContainer');
-      container.scrollTop = container.scrollHeight;
-    }
-
-    // Add message to chat
-    function addMessage(role, content, metadata = null) {
-      messages.push({ role, content });
+  <!-- CHAT TAB -->
+  <div id="content-chat" class="tab-content active">
+    <div class="flex flex-col h-screen">
       
-      const messagesDiv = document.getElementById('messages');
-      const messageEl = document.createElement('div');
-      messageEl.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : 'flex-row'}`;
-      
-      messageEl.innerHTML = `
-        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-          role === 'user' 
-            ? 'bg-gradient-to-br from-blue-500 to-blue-600' 
-            : 'bg-gradient-to-br from-purple-500 to-pink-600'
-        }">
-          <span class="text-white">${role === 'user' ? '👤' : '🧠'}</span>
-        </div>
-        <div class="flex-1 space-y-2">
-          <div class="px-4 py-3 rounded-2xl ${
-            role === 'user'
-              ? 'bg-blue-500 text-white'
-              : 'bg-white text-gray-800 shadow-sm border border-purple-100'
-          }">
-            <p class="whitespace-pre-wrap leading-relaxed">${escapeHtml(content)}</p>
-          </div>
-          ${metadata ? `
-            <div class="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-              ${metadata}
+      <!-- Header -->
+      <div class="bg-white border-b shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+                <span class="text-2xl">🧠</span>
+              </div>
+              <div>
+                <h1 class="text-xl font-bold text-gray-800">AI Assistant</h1>
+                <p class="text-xs text-gray-500">Your Personal AI</p>
+              </div>
             </div>
-          ` : ''}
+            <button onclick="clearChat()" class="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+              🗑️ Clear
+            </button>
+          </div>
         </div>
-      `;
-      
-      messagesDiv.appendChild(messageEl);
-      scrollToBottom();
-    }
+      </div>
 
-    // Show loading indicator
-    function showLoading() {
-      const messagesDiv = document.getElementById('messages');
-      const loadingEl = document.createElement('div');
-      loadingEl.id = 'loading';
-      loadingEl.className = 'flex gap-3';
-      loadingEl.innerHTML = `
-        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0">
-          <span class="text-white">🧠</span>
-        </div>
-        <div class="flex-1 px-4 py-3 rounded-2xl bg-white shadow-sm border border-purple-100">
-          <div class="flex items-center gap-3">
-            <div class="animate-spin text-2xl">⏳</div>
-            <div class="text-sm text-gray-600">
-              <div class="font-medium" id="loadingText">AI sedang berpikir...</div>
-              <div class="text-xs text-gray-500 mt-1" id="loadingSubtext">
-                ${currentMode === 'smart' ? 'Mengumpulkan jawaban dari berbagai AI...' : 'Mencari AI terbaik yang tersedia...'}
+      <!-- Messages -->
+      <div id="messagesContainer" class="flex-1 overflow-y-auto">
+        <div class="max-w-4xl mx-auto px-4 py-6 space-y-6" id="messages">
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0">
+              <span class="text-white">🧠</span>
+            </div>
+            <div class="flex-1">
+              <div class="px-4 py-3 rounded-2xl bg-white text-gray-800 shadow-sm border border-purple-100">
+                <p class="leading-relaxed">
+                  👋 <strong>Halo! Saya AI Assistant Anda.</strong><br><br>
+                  Saya siap membantu menjawab pertanyaan, memberikan solusi, atau sekadar mengobrol.<br><br>
+                  Silakan tanyakan apa saja! 🚀
+                </p>
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Input -->
+      <div class="bg-white border-t shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+          <div class="flex gap-3">
+            <textarea
+              id="userInput"
+              placeholder="Tanyakan apa saja..."
+              class="flex-1 px-4 py-3 border border-purple-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+              rows="1"
+              onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"
+            ></textarea>
+            <button
+              onclick="sendMessage()"
+              id="sendBtn"
+              class="px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:from-purple-600 hover:to-pink-700"
+            >
+              <span>📤</span>
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mt-2 text-center" id="statusText">Ready</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ADMIN TAB -->
+  <div id="content-admin" class="tab-content">
+    <div class="max-w-6xl mx-auto p-6">
+      
+      <!-- Header -->
+      <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+              <span class="text-2xl">⚙️</span>
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold text-gray-800">System Configuration</h1>
+              <p class="text-sm text-gray-500">Backend AI Providers Management</p>
+            </div>
+          </div>
+          <button onclick="saveConfig()" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+            💾 Save All
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-blue-50 rounded-lg p-4">
+            <div class="text-2xl font-bold text-blue-600" id="statsTotal">0</div>
+            <div class="text-sm text-gray-600">Total Sources</div>
+          </div>
+          <div class="bg-green-50 rounded-lg p-4">
+            <div class="text-2xl font-bold text-green-600" id="statsActive">0</div>
+            <div class="text-sm text-gray-600">Active & Ready</div>
+          </div>
+          <div class="bg-amber-50 rounded-lg p-4">
+            <div class="text-2xl font-bold text-amber-600" id="statsPending">0</div>
+            <div class="text-sm text-gray-600">Need API Key</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
+        <p class="text-sm text-blue-800">
+          <strong>⚙️ Configuration:</strong> Setup AI backend untuk enable responses. 
+          Minimal 1 provider required untuk sistem berfungsi dengan baik.
+        </p>
+      </div>
+
+      <!-- AI Sources -->
+      <div id="adminSources" class="space-y-4">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Instructions -->
+      <div class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6 mt-6">
+        <h3 class="text-lg font-bold text-purple-900 mb-3">📚 Provider Setup Guide</h3>
+        <div class="space-y-2 text-sm text-purple-800">
+          <div><strong>Groq:</strong> <a href="https://console.groq.com/" target="_blank" class="underline">console.groq.com</a> → API Keys → Create</div>
+          <div><strong>OpenRouter:</strong> <a href="https://openrouter.ai/" target="_blank" class="underline">openrouter.ai</a> → Keys → Create</div>
+          <div><strong>HuggingFace:</strong> <a href="https://huggingface.co/settings/tokens" target="_blank" class="underline">huggingface.co/settings/tokens</a></div>
+          <div class="mt-3 pt-3 border-t border-purple-200 text-xs">
+            💡 <strong>Note:</strong> API credentials are stored locally in your browser and never transmitted to external servers except the AI providers themselves.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ==================== STATE ====================
+    let currentTab = 'chat';
+    let messages = [];
+    let isLoading = false;
+    let aiSources = [];
+
+    // Default AI sources
+    const defaultSources = [
+      {
+        id: 'groq-1',
+        name: 'Groq (Llama 3.3 70B)',
+        provider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+        apiKey: '',
+        priority: 1,
+        enabled: true,
+        description: '✨ Terbaru & tercepat! Gratis unlimited. RECOMMENDED!'
+      },
+      {
+        id: 'groq-2',
+        name: 'Groq (Llama 3.1 70B)',
+        provider: 'groq',
+        model: 'llama-3.1-70b-versatile',
+        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+        apiKey: '',
+        priority: 2,
+        enabled: true,
+        description: 'Backup stabil, gratis unlimited'
+      },
+      {
+        id: 'openrouter-1',
+        name: 'OpenRouter (GPT-3.5)',
+        provider: 'openrouter',
+        model: 'openai/gpt-3.5-turbo',
+        endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+        apiKey: '',
+        priority: 3,
+        enabled: false,
+        description: 'Multi-model gateway, ada free tier'
+      }
+    ];
+
+    // ==================== INIT ====================
+    function init() {
+      loadSources();
+      renderAdminPanel();
+      updateStats();
+    }
+
+    function loadSources() {
+      const saved = localStorage.getItem('ai_sources');
+      aiSources = saved ? JSON.parse(saved) : [...defaultSources];
+    }
+
+    function saveConfig() {
+      localStorage.setItem('ai_sources', JSON.stringify(aiSources));
+      alert('✅ Configuration saved!');
+      updateStats();
+    }
+
+    // ==================== TAB SWITCHING ====================
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById(`content-${tab}`).classList.add('active');
+      
+      document.querySelectorAll('[id^="tab-"]').forEach(el => {
+        el.className = 'px-6 py-3 font-medium border-b-2 border-transparent text-gray-600 hover:text-purple-600';
+      });
+      document.getElementById(`tab-${tab}`).className = 'px-6 py-3 font-medium border-b-2 border-purple-500 text-purple-600';
+      
+      if (tab === 'admin') {
+        renderAdminPanel();
+        updateStats();
+      }
+    }
+
+    // ==================== ADMIN PANEL ====================
+    function renderAdminPanel() {
+      const container = document.getElementById('adminSources');
+      container.innerHTML = aiSources.map(source => {
+        const hasKey = source.apiKey && source.apiKey.length > 5;
+        return `
+          <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-start gap-4">
+              <label class="relative inline-flex items-center cursor-pointer mt-1">
+                <input type="checkbox" ${source.enabled ? 'checked' : ''} 
+                       onchange="toggleSource('${source.id}')" 
+                       ${!hasKey ? 'disabled' : ''}
+                       class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+              
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                  <h3 class="text-lg font-bold">${source.name}</h3>
+                  ${hasKey && source.enabled ? '<span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✓ Active</span>' : ''}
+                  ${!hasKey ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">⚠ Need Key</span>' : ''}
+                </div>
+                <p class="text-sm text-gray-600 mb-3">${source.description}</p>
+                <input
+                  type="password"
+                  id="key-${source.id}"
+                  value="${source.apiKey || ''}"
+                  placeholder="${getKeyPlaceholder(source.provider)}"
+                  onchange="updateKey('${source.id}', this.value)"
+                  class="w-full px-3 py-2 text-sm border ${hasKey ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'} rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getKeyPlaceholder(provider) {
+      return { groq: 'gsk_...', openrouter: 'sk-or-...', huggingface: 'hf_...' }[provider] || 'API Key';
+    }
+
+    function toggleSource(id) {
+      const source = aiSources.find(s => s.id === id);
+      if (source) {
+        source.enabled = !source.enabled;
+        renderAdminPanel();
+      }
+    }
+
+    function updateKey(id, key) {
+      const source = aiSources.find(s => s.id === id);
+      if (source) {
+        source.apiKey = key.trim();
+        renderAdminPanel();
+      }
+    }
+
+    function updateStats() {
+      const active = aiSources.filter(s => s.enabled && s.apiKey).length;
+      const pending = aiSources.filter(s => !s.apiKey).length;
+      document.getElementById('statsTotal').textContent = aiSources.length;
+      document.getElementById('statsActive').textContent = active;
+      document.getElementById('statsPending').textContent = pending;
+    }
+
+    // ==================== CHAT ====================
+    function addMessage(role, content, metadata = null) {
+      messages.push({ role, content });
+      const container = document.getElementById('messages');
+      const msg = document.createElement('div');
+      msg.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''}`;
+      msg.innerHTML = `
+        <div class="w-8 h-8 rounded-full ${role === 'user' ? 'bg-blue-500' : 'bg-gradient-to-br from-purple-500 to-pink-600'} flex items-center justify-center flex-shrink-0">
+          <span class="text-white">${role === 'user' ? '👤' : '🧠'}</span>
+        </div>
+        <div class="flex-1">
+          <div class="px-4 py-3 rounded-2xl ${role === 'user' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800 shadow-sm border border-purple-100'}">
+            <p class="whitespace-pre-wrap">${escapeHtml(content)}</p>
+          </div>
+          ${metadata ? `<div class="px-3 py-2 mt-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">${metadata}</div>` : ''}
+        </div>
       `;
-      messagesDiv.appendChild(loadingEl);
-      scrollToBottom();
+      container.appendChild(msg);
+      document.getElementById('messagesContainer').scrollTop = 999999;
+    }
+
+    function showLoading() {
+      const container = document.getElementById('messages');
+      const loading = document.createElement('div');
+      loading.id = 'loading';
+      loading.className = 'flex gap-3';
+      loading.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+          <span class="text-white">🧠</span>
+        </div>
+        <div class="px-4 py-3 rounded-2xl bg-white shadow-sm border border-purple-100">
+          <div class="flex items-center gap-2"><div class="animate-spin">⏳</div><span class="text-sm">Processing...</span></div>
+        </div>
+      `;
+      container.appendChild(loading);
+      document.getElementById('messagesContainer').scrollTop = 999999;
     }
 
     function hideLoading() {
@@ -173,156 +351,106 @@
       if (loading) loading.remove();
     }
 
-    // Send message
     async function sendMessage() {
       if (isLoading) return;
-      
       const input = document.getElementById('userInput');
       const question = input.value.trim();
-      
       if (!question) return;
-      
-      // Add user message
+
       addMessage('user', question);
       input.value = '';
-      input.style.height = 'auto';
-      
-      // Show loading
       isLoading = true;
       showLoading();
-      updateStatus('Sending...');
       document.getElementById('sendBtn').disabled = true;
-      
+
       try {
-        // Load AI sources dari localStorage
-        const aiSourcesJson = localStorage.getItem('ai_sources');
-        let aiSources = [];
+        const enabledSources = aiSources.filter(s => s.enabled && s.apiKey);
         
-        if (aiSourcesJson) {
-          aiSources = JSON.parse(aiSourcesJson);
-        }
-        
-        // Call backend API
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: messages.map(m => ({ role: m.role, content: m.content })),
-            aiSources: aiSources, // Kirim config dari admin panel
-            mode: currentMode
-          })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || error.error || 'API request failed');
+        if (enabledSources.length === 0) {
+          throw new Error('SERVICE_UNAVAILABLE');
         }
 
-        const data = await response.json();
-        
+        const result = await queryAI(enabledSources, question);
         hideLoading();
-        
-        // Create metadata
-        let metadata = '';
-        if (currentMode === 'smart' && data.sources) {
-          metadata = `🎓 <strong>Belajar dari:</strong> ${data.sources.join(', ')}<br>💯 <strong>Confidence:</strong> ${data.confidence}%`;
-        } else if (data.source) {
-          metadata = `📚 <strong>Sumber:</strong> ${data.source}`;
-        }
-        
-        addMessage('assistant', data.answer, metadata);
-        updateStatus('Ready');
-        
+        addMessage('assistant', result.answer); // NO METADATA
+        document.getElementById('statusText').textContent = 'Ready';
       } catch (error) {
         hideLoading();
-        console.error('Error:', error);
         
-        addMessage('assistant', 
-          `❌ Maaf, terjadi kesalahan: ${error.message}\n\n` +
-          `Kemungkinan penyebab:\n` +
-          `• API keys belum dikonfigurasi di Admin Panel\n` +
-          `• Semua AI providers sedang down\n` +
-          `• Koneksi internet terputus\n\n` +
-          `💡 <strong>Solusi:</strong>\n` +
-          `1. Buka <a href="/admin.html" target="_blank" class="underline">Admin Panel</a>\n` +
-          `2. Setup minimal 1 API key (Groq recommended)\n` +
-          `3. Kembali dan coba lagi`
-        );
-        updateStatus('Error');
+        // Professional error message (no technical details)
+        let errorMsg = '😔 Maaf, saya sedang mengalami gangguan sementara.';
+        
+        if (error.message === 'SERVICE_UNAVAILABLE') {
+          errorMsg = '🔧 Sistem sedang dalam pemeliharaan. Silakan coba lagi dalam beberapa saat.';
+        } else if (error.message === 'All AI sources failed') {
+          errorMsg = '⚠️ Maaf, saya tidak dapat merespons saat ini. Mohon coba lagi dalam beberapa menit.';
+        } else {
+          errorMsg = '😔 Terjadi kesalahan saat memproses permintaan Anda. Silakan coba lagi.';
+        }
+        
+        addMessage('assistant', errorMsg);
+        document.getElementById('statusText').textContent = 'Ready';
       } finally {
         isLoading = false;
         document.getElementById('sendBtn').disabled = false;
       }
     }
 
-    // Clear chat
+    async function queryAI(sources, question) {
+      for (const source of sources) {
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          
+          if (source.provider === 'groq' || source.provider === 'openai') {
+            headers['Authorization'] = `Bearer ${source.apiKey}`;
+          } else if (source.provider === 'openrouter') {
+            headers['Authorization'] = `Bearer ${source.apiKey}`;
+            headers['HTTP-Referer'] = window.location.origin;
+          }
+
+          const body = {
+            model: source.model,
+            messages: [...messages.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: question }],
+            max_tokens: 2048,
+            temperature: 0.7
+          };
+
+          const response = await fetch(source.endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body)
+          });
+
+          if (!response.ok) throw new Error(`Provider failed`);
+          
+          const data = await response.json();
+          const answer = data.choices[0].message.content;
+
+          return { answer }; // NO METADATA - look professional!
+        } catch (error) {
+          console.error(`Provider failed:`, error);
+          continue; // Try next provider silently
+        }
+      }
+      throw new Error('All AI sources failed');
+    }
+
     function clearChat() {
-      if (confirm('Hapus semua chat?')) {
+      if (confirm('Clear chat?')) {
         messages = [];
         document.getElementById('messages').innerHTML = '';
-        addMessage('assistant', '🎉 Chat telah di-reset. Silakan mulai percakapan baru!');
+        addMessage('assistant', '✨ Chat cleared! Ask me anything.');
       }
     }
 
-    // Toggle mode
-    function toggleMode() {
-      currentMode = currentMode === 'smart' ? 'fast' : 'smart';
-      const btn = document.getElementById('modeBtn');
-      const info = document.getElementById('modeInfo');
-      
-      if (currentMode === 'smart') {
-        btn.textContent = '🧠 Smart';
-        btn.className = 'px-3 py-2 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors';
-        info.innerHTML = '<strong>Smart Mode:</strong> AI belajar dari berbagai sumber untuk hasil terbaik (lebih lambat tapi lebih komprehensif)';
-      } else {
-        btn.textContent = '⚡ Fast';
-        btn.className = 'px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors';
-        info.innerHTML = '<strong>Fast Mode:</strong> Menggunakan AI tercepat yang tersedia dengan fallback otomatis (cepat & reliable)';
-      }
-    }
-
-    // Update status
-    function updateStatus(text) {
-      document.getElementById('statusText').textContent = text;
-    }
-
-    // Handle keyboard shortcuts
-    function handleKeyPress(e) {
-      // Ctrl+Enter or Cmd+Enter to send
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        sendMessage();
-        return;
-      }
-      
-      // Enter alone to send (unless Shift is pressed for newline)
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-        return;
-      }
-      
-      // Auto-resize textarea
-      setTimeout(() => {
-        const textarea = e.target;
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
-      }, 0);
-    }
-
-    // Escape HTML
     function escapeHtml(text) {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
     }
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('userInput').focus();
-    });
+    // ==================== INIT ====================
+    init();
   </script>
 
 </body>
