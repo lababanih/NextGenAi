@@ -1,5 +1,5 @@
-// NextGenAI - FIXED VERSION
-// Proper artifact parsing, responsive design, hidden admin access
+// NextGenAI - FINAL FIX
+// Complete Claude-like artifact system
 
 let currentTab = 'chat';
 let messages = [];
@@ -13,14 +13,11 @@ let enabledTools = {
   imageanalyze: false,
   dataanalyze: false
 };
-let uploadedFile = null;
-let uploadedFileData = null;
 let artifactCount = 0;
 
 function init() {
   loadSources();
   loadToolsState();
-  updateActiveToolsDisplay();
   
   if (aiSources.length === 0 || !aiSources.some(s => s.apiKey)) {
     showAdminWarning();
@@ -33,7 +30,7 @@ function showAdminWarning() {
   banner.innerHTML = `
     <p class="text-sm text-amber-800">
       <strong>⚠️ Configuration Required:</strong> No AI sources configured. 
-      Please contact your administrator to setup the system.
+      Please contact your administrator.
     </p>
   `;
   document.getElementById('messages').appendChild(banner);
@@ -50,10 +47,6 @@ function loadToolsState() {
   const saved = localStorage.getItem('enabled_tools');
   if (saved) {
     enabledTools = { ...enabledTools, ...JSON.parse(saved) };
-    Object.keys(enabledTools).forEach(tool => {
-      const checkbox = document.getElementById(`tool-${tool}`);
-      if (checkbox) checkbox.checked = enabledTools[tool];
-    });
   }
 }
 
@@ -68,51 +61,31 @@ function switchTab(tab) {
   document.getElementById(`tab-${tab}`).className = 'px-4 sm:px-6 py-3 text-sm sm:text-base font-medium border-b-2 border-purple-500 text-purple-600';
 }
 
-function toggleTool(toolId) {
-  if (toolId === 'artifacts') return;
-  const checkbox = document.getElementById(`tool-${toolId}`);
-  checkbox.checked = !checkbox.checked;
-  updateToolStatus();
+function toggleToolsMenu() {
+  const menu = document.getElementById('toolsMenu');
+  menu.classList.toggle('hidden');
 }
 
-function updateToolStatus() {
+function toggleTool(toolId) {
+  enabledTools[toolId] = !enabledTools[toolId];
+  localStorage.setItem('enabled_tools', JSON.stringify(enabledTools));
+  
+  // Update checkbox
+  const checkbox = document.getElementById(`tool-${toolId}`);
+  if (checkbox) checkbox.checked = enabledTools[toolId];
+  
+  // Update button appearance
+  updateToolButtons();
+}
+
+function updateToolButtons() {
+  // Update tool menu checkboxes
   Object.keys(enabledTools).forEach(tool => {
-    const checkbox = document.getElementById(`tool-${tool}`);
-    if (checkbox) {
-      enabledTools[tool] = checkbox.checked;
-      const card = checkbox.closest('.tool-card');
-      if (card) {
-        card.classList.toggle('active', enabledTools[tool]);
-      }
+    const item = document.getElementById(`tool-${tool}`);
+    if (item) {
+      item.checked = enabledTools[tool];
     }
   });
-  
-  updateActiveToolsDisplay();
-  localStorage.setItem('enabled_tools', JSON.stringify(enabledTools));
-}
-
-function updateActiveToolsDisplay() {
-  const container = document.getElementById('activeTools');
-  const activeTools = Object.entries(enabledTools).filter(([_, enabled]) => enabled);
-  
-  if (activeTools.length > 0) {
-    container.classList.remove('hidden');
-    const toolNames = {
-      artifacts: '🎨 Artifacts',
-      websearch: '🔍 Search',
-      coderun: '💻 Code',
-      imagegen: '🖼️ Generate',
-      imageanalyze: '👁️ Analyze',
-      dataanalyze: '📊 Data'
-    };
-    
-    container.innerHTML = '<span class="text-xs text-gray-600">Active:</span> ' +
-      activeTools.map(([tool]) => 
-        `<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">${toolNames[tool]}</span>`
-      ).join(' ');
-  } else {
-    container.classList.add('hidden');
-  }
 }
 
 function addMessage(role, content, options = {}) {
@@ -163,23 +136,18 @@ function renderArtifact(artifact) {
   const artifactId = `artifact-${artifactCount}`;
   
   let previewContent = '';
-  let codeView = `<div class="artifact-code">${escapeHtml(artifact.code)}</div>`;
   
-  if (artifact.type === 'html' || artifact.type === 'react') {
+  if (artifact.type === 'html') {
     previewContent = `
       <iframe 
         id="${artifactId}-preview" 
         class="w-full h-full border-0" 
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts allow-same-origin allow-forms"
         srcdoc="${escapeHtml(artifact.code)}"
       ></iframe>
     `;
-  } else if (artifact.type === 'svg') {
-    previewContent = `<div class="p-4 flex items-center justify-center">${artifact.code}</div>`;
-  } else if (artifact.type === 'markdown') {
-    previewContent = `<div class="p-4 prose max-w-none">${marked.parse(artifact.code)}</div>`;
   } else {
-    previewContent = `<div class="p-4 text-gray-600 text-sm">No preview available for ${artifact.type}</div>`;
+    previewContent = `<div class="p-4 text-gray-600 text-sm">Preview not available</div>`;
   }
   
   return `
@@ -189,14 +157,14 @@ function renderArtifact(artifact) {
           <span class="text-2xl">🎨</span>
           <div>
             <h3 class="text-white font-semibold text-sm sm:text-base">${artifact.title}</h3>
-            <p class="text-purple-200 text-xs">${artifact.type.toUpperCase()} • ${artifact.language || 'Mixed'}</p>
+            <p class="text-purple-200 text-xs">${artifact.type.toUpperCase()}</p>
           </div>
         </div>
         <div class="artifact-header-right">
-          <button onclick="copyArtifact('${artifactId}')" class="artifact-button bg-white text-purple-600 hover:bg-purple-50">
+          <button onclick="copyArtifactCode('${artifactId}')" class="artifact-button bg-white text-purple-600 hover:bg-purple-50">
             📋 Copy
           </button>
-          <button onclick="downloadArtifact('${artifactId}', '${artifact.title}', '${artifact.type}')" class="artifact-button bg-white text-purple-600 hover:bg-purple-50">
+          <button onclick="downloadArtifactCode('${artifactId}', '${escapeHtml(artifact.title)}', '${artifact.type}')" class="artifact-button bg-white text-purple-600 hover:bg-purple-50">
             💾 Download
           </button>
         </div>
@@ -216,13 +184,13 @@ function renderArtifact(artifact) {
           ${previewContent}
         </div>
         <div id="${artifactId}-code-tab" class="hidden">
-          ${codeView}
+          <div class="artifact-code">${escapeHtml(artifact.code)}</div>
         </div>
       </div>
     </div>
     
     <script>
-      window['artifact_${artifactId}'] = ${JSON.stringify(artifact.code)};
+      window['artifact_code_${artifactId}'] = ${JSON.stringify(artifact.code)};
     </script>
   `;
 }
@@ -230,31 +198,31 @@ function renderArtifact(artifact) {
 function switchArtifactTab(artifactId, tab) {
   const container = document.querySelector(`#${artifactId}-preview-tab`).parentElement.parentElement;
   container.querySelectorAll('.artifact-tab').forEach(t => t.classList.remove('active'));
-  container.querySelector(`.artifact-tab:nth-child(${tab === 'preview' ? 1 : 2})`).classList.add('active');
+  
+  if (tab === 'preview') {
+    container.querySelector('.artifact-tab:first-child').classList.add('active');
+  } else {
+    container.querySelector('.artifact-tab:last-child').classList.add('active');
+  }
   
   document.getElementById(`${artifactId}-preview-tab`).classList.toggle('hidden', tab !== 'preview');
   document.getElementById(`${artifactId}-code-tab`).classList.toggle('hidden', tab !== 'code');
 }
 
-function copyArtifact(artifactId) {
-  const code = window[`artifact_${artifactId}`];
+function copyArtifactCode(artifactId) {
+  const code = window[`artifact_code_${artifactId}`];
   navigator.clipboard.writeText(code).then(() => {
     alert('✅ Code copied to clipboard!');
+  }).catch(() => {
+    alert('❌ Failed to copy code');
   });
 }
 
-function downloadArtifact(artifactId, title, type) {
-  const code = window[`artifact_${artifactId}`];
-  const extensions = {
-    html: 'html',
-    react: 'jsx',
-    javascript: 'js',
-    python: 'py',
-    svg: 'svg',
-    markdown: 'md'
-  };
-  
+function downloadArtifactCode(artifactId, title, type) {
+  const code = window[`artifact_code_${artifactId}`];
+  const extensions = { html: 'html', react: 'jsx', javascript: 'js', python: 'py' };
   const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${extensions[type] || 'txt'}`;
+  
   const blob = new Blob([code], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -317,28 +285,6 @@ function hideLoading() {
   document.getElementById('statusText').textContent = 'Ready';
 }
 
-function showFileUpload() {
-  document.getElementById('fileInput').click();
-}
-
-async function handleFileUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  uploadedFile = file;
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    uploadedFileData = e.target.result;
-    addMessage('user', `📎 Uploaded: ${file.name}`);
-  };
-  
-  if (file.type.startsWith('image/')) {
-    reader.readAsDataURL(file);
-  } else {
-    reader.readAsText(file);
-  }
-}
-
 async function sendMessage() {
   if (isLoading) return;
   const input = document.getElementById('userInput');
@@ -358,7 +304,7 @@ async function sendMessage() {
     const wantsArtifact = detectArtifactIntent(question);
     
     if (wantsArtifact) {
-      const result = await generateArtifact(question, aiSources);
+      const result = await generateArtifactWithAI(question, aiSources);
       hideLoading();
       
       if (result.artifact) {
@@ -367,7 +313,7 @@ async function sendMessage() {
         }
         addMessage('assistant', '', { artifact: result.artifact });
       } else {
-        addMessage('assistant', result.answer || 'Failed to generate artifact. Please try again with more specific instructions.');
+        addMessage('assistant', result.answer || 'I apologize, but I was unable to generate the code. Please try with more specific instructions.');
       }
     } else {
       const result = await queryAI(aiSources, question);
@@ -376,6 +322,7 @@ async function sendMessage() {
     }
   } catch (error) {
     hideLoading();
+    console.error('Error:', error);
     let errorMsg = '😔 Sorry, I encountered an error. Please try again.';
     if (error.message === 'NO_AI_CONFIGURED') {
       errorMsg = '🔧 System not configured. Please contact administrator.';
@@ -387,46 +334,47 @@ async function sendMessage() {
 }
 
 function detectArtifactIntent(text) {
-  const artifactKeywords = [
+  const keywords = [
     'create', 'build', 'make', 'generate', 'buat', 'bikin',
-    'website', 'app', 'application', 'component', 'page',
-    'html', 'css', 'javascript', 'react', 'code',
-    'calculator', 'game', 'form', 'dashboard', 'chart',
-    'timer', 'clock', 'counter', 'animation', 'button'
+    'website', 'app', 'calculator', 'game', 'form', 
+    'dashboard', 'chart', 'timer', 'admin panel'
   ];
-  
   const lowerText = text.toLowerCase();
-  return artifactKeywords.some(kw => lowerText.includes(kw));
+  return keywords.some(kw => lowerText.includes(kw));
 }
 
-async function generateArtifact(prompt, sources) {
-  const systemPrompt = `You are an expert code generator. Generate COMPLETE, WORKING code based on user requests.
+async function generateArtifactWithAI(prompt, sources) {
+  // CRITICAL: System prompt yang memaksa AI generate code, bukan JSON
+  const systemPrompt = `You are a code generator. When user asks to create something, you MUST:
 
-CRITICAL RULES:
-1. ALWAYS respond with ONLY valid JSON in this exact format:
-{
-  "explanation": "Brief explanation of what you created",
-  "artifact": {
-    "title": "Project Name",
-    "type": "html",
-    "language": "html",
-    "code": "COMPLETE WORKING CODE HERE"
-  }
-}
+1. Generate ONLY the complete HTML code
+2. NO explanations before or after
+3. NO JSON format
+4. NO markdown code blocks
+5. Start directly with <!DOCTYPE html>
+6. Include Tailwind CSS via CDN
+7. Make it beautiful and functional
+8. All CSS and JS must be inline
 
-2. Code MUST be:
-   - Complete and functional (no placeholders)
-   - Self-contained (all CSS/JS inline for HTML)
-   - Production-ready
-   - Beautiful with modern design
-   - Use Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
+Example - if user asks "create a button":
+You respond with ONLY this (no extra text):
 
-3. NO markdown formatting, NO backticks, ONLY JSON
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Button</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gray-100">
+  <button class="px-8 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+    Click Me
+  </button>
+</body>
+</html>
 
-4. For HTML: Include <!DOCTYPE html>, complete structure, inline styles/scripts
-
-Example response:
-{"explanation":"Created a calculator","artifact":{"title":"Calculator","type":"html","language":"html","code":"<!DOCTYPE html><html>..."}}`;
+REMEMBER: NO text before or after the code. Start with <!DOCTYPE html> immediately.`;
 
   for (const source of sources) {
     try {
@@ -447,52 +395,59 @@ Example response:
         })
       });
 
-      if (!response.ok) continue;
-      
-      const data = await response.json();
-      let content = data.choices[0].message.content.trim();
-      
-      // Clean up response
-      content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
-      
-      // Remove any leading/trailing text before/after JSON
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}');
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        content = content.substring(jsonStart, jsonEnd + 1);
+      if (!response.ok) {
+        console.error(`Source ${source.name} failed: ${response.status}`);
+        continue;
       }
       
-      try {
-        const parsed = JSON.parse(content);
-        if (parsed.artifact && parsed.artifact.code) {
-          return parsed;
+      const data = await response.json();
+      let code = data.choices[0].message.content.trim();
+      
+      // Clean up the code
+      // Remove markdown code blocks if present
+      code = code.replace(/```html\n?/g, '').replace(/```\n?$/g, '');
+      
+      // If code doesn't start with <!DOCTYPE, it might be wrapped in text
+      if (!code.startsWith('<!DOCTYPE') && !code.startsWith('<html')) {
+        // Try to extract HTML from the response
+        const htmlMatch = code.match(/<!DOCTYPE[\s\S]*<\/html>/i);
+        if (htmlMatch) {
+          code = htmlMatch[0];
         }
-      } catch (e) {
-        console.error('JSON parse error:', e);
-        // If not valid JSON, try to extract code and create artifact manually
+      }
+      
+      // Verify we have valid HTML
+      if (code.includes('<!DOCTYPE') || code.includes('<html')) {
+        // Extract title from code if possible
+        const titleMatch = code.match(/<title>(.*?)<\/title>/i);
+        const title = titleMatch ? titleMatch[1] : 'Generated Code';
+        
         return {
           explanation: "I've created what you requested:",
           artifact: {
-            title: "Generated Code",
-            type: "html",
-            language: "html",
-            code: content
+            title: title,
+            type: 'html',
+            code: code
           }
         };
       }
+      
+      console.error('Invalid HTML generated:', code.substring(0, 200));
+      continue;
+      
     } catch (error) {
-      console.error('Source failed:', error);
+      console.error(`Error with ${source.name}:`, error);
       continue;
     }
   }
   
-  return { answer: "Failed to generate artifact. Please try again with clearer instructions." };
+  return { 
+    answer: "I apologize, but I couldn't generate the code. Please try again with more specific details about what you want to create." 
+  };
 }
 
 async function queryAI(sources, question) {
-  const systemPrompt = `You are NextGenAI, a helpful AI assistant.
-
-Be concise, professional, and helpful. If user wants to create something, suggest using phrases like "create", "build", or "make".`;
+  const systemPrompt = `You are NextGenAI, a helpful AI assistant. Be concise and professional.`;
 
   for (const source of sources) {
     try {
@@ -531,5 +486,14 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// Close tools menu when clicking outside
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('toolsMenu');
+  const button = document.querySelector('[onclick="toggleToolsMenu()"]');
+  if (menu && !menu.contains(e.target) && !button?.contains(e.target)) {
+    menu.classList.add('hidden');
+  }
+});
 
 window.addEventListener('DOMContentLoaded', init);
