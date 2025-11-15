@@ -194,6 +194,14 @@
       document.getElementById('sendBtn').disabled = true;
       
       try {
+        // Load AI sources dari localStorage
+        const aiSourcesJson = localStorage.getItem('ai_sources');
+        let aiSources = [];
+        
+        if (aiSourcesJson) {
+          aiSources = JSON.parse(aiSourcesJson);
+        }
+        
         // Call backend API
         const response = await fetch('/api/chat', {
           method: 'POST',
@@ -202,6 +210,7 @@
           },
           body: JSON.stringify({
             messages: messages.map(m => ({ role: m.role, content: m.content })),
+            aiSources: aiSources, // Kirim config dari admin panel
             mode: currentMode
           })
         });
@@ -233,10 +242,13 @@
         addMessage('assistant', 
           `❌ Maaf, terjadi kesalahan: ${error.message}\n\n` +
           `Kemungkinan penyebab:\n` +
-          `• API keys belum dikonfigurasi di backend\n` +
+          `• API keys belum dikonfigurasi di Admin Panel\n` +
           `• Semua AI providers sedang down\n` +
           `• Koneksi internet terputus\n\n` +
-          `Silakan coba lagi dalam beberapa saat atau hubungi admin.`
+          `💡 <strong>Solusi:</strong>\n` +
+          `1. Buka <a href="/admin.html" target="_blank" class="underline">Admin Panel</a>\n` +
+          `2. Setup minimal 1 API key (Groq recommended)\n` +
+          `3. Kembali dan coba lagi`
         );
         updateStatus('Error');
       } finally {
