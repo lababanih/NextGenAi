@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Assistant - Your Personal AI</title>
+  <title>NextGenAI - Your AI Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .tab-content { display: none; }
@@ -39,8 +39,8 @@
                 <span class="text-2xl">🧠</span>
               </div>
               <div>
-                <h1 class="text-xl font-bold text-gray-800">AI Assistant</h1>
-                <p class="text-xs text-gray-500">Your Personal AI</p>
+                <h1 class="text-xl font-bold text-gray-800">NextGenAI</h1>
+                <p class="text-xs text-gray-500">Your AI Assistant</p>
               </div>
             </div>
             <button onclick="clearChat()" class="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
@@ -60,9 +60,9 @@
             <div class="flex-1">
               <div class="px-4 py-3 rounded-2xl bg-white text-gray-800 shadow-sm border border-purple-100">
                 <p class="leading-relaxed">
-                  👋 <strong>Halo! Saya AI Assistant Anda.</strong><br><br>
-                  Saya siap membantu menjawab pertanyaan, memberikan solusi, atau sekadar mengobrol.<br><br>
-                  Silakan tanyakan apa saja! 🚀
+                  👋 <strong>Hello! I'm NextGenAI.</strong><br><br>
+                  I'm here to help you with questions, provide solutions, or just have a conversation. Feel free to ask me anything!<br><br>
+                  What can I help you with today? 🚀
                 </p>
               </div>
             </div>
@@ -174,36 +174,36 @@
     const defaultSources = [
       {
         id: 'groq-1',
-        name: 'Groq (Llama 3.3 70B)',
+        name: 'Primary Engine',
         provider: 'groq',
         model: 'llama-3.3-70b-versatile',
         endpoint: 'https://api.groq.com/openai/v1/chat/completions',
         apiKey: '',
         priority: 1,
         enabled: true,
-        description: '✨ Terbaru & tercepat! Gratis unlimited. RECOMMENDED!'
+        description: '✨ Main processing engine - Fast & reliable'
       },
       {
         id: 'groq-2',
-        name: 'Groq (Llama 3.1 70B)',
+        name: 'Backup Engine',
         provider: 'groq',
         model: 'llama-3.1-70b-versatile',
         endpoint: 'https://api.groq.com/openai/v1/chat/completions',
         apiKey: '',
         priority: 2,
         enabled: true,
-        description: 'Backup stabil, gratis unlimited'
+        description: 'Fallback processing unit'
       },
       {
         id: 'openrouter-1',
-        name: 'OpenRouter (GPT-3.5)',
+        name: 'Extended Engine',
         provider: 'openrouter',
         model: 'openai/gpt-3.5-turbo',
         endpoint: 'https://openrouter.ai/api/v1/chat/completions',
         apiKey: '',
         priority: 3,
         enabled: false,
-        description: 'Multi-model gateway, ada free tier'
+        description: 'Additional processing capacity'
       }
     ];
 
@@ -397,6 +397,38 @@
     }
 
     async function queryAI(sources, question) {
+      // System prompt to define NextGenAI identity and response style
+      const systemPrompt = {
+        role: 'system',
+        content: `You are NextGenAI, an advanced AI assistant. 
+
+IDENTITY:
+- Your name is NextGenAI
+- You are an independent AI assistant
+- Never mention or identify as Claude, GPT, Llama, or any other AI
+- If asked "who made you" or "who are you", say you are NextGenAI developed as an advanced AI assistant
+- Never reveal technical details about your backend or training
+
+RESPONSE STYLE (like Claude Sonnet 4.5):
+- Be helpful, harmless, and honest
+- Provide thoughtful, well-structured responses
+- Use clear formatting with paragraphs, bullet points when appropriate
+- Be concise but comprehensive
+- Show reasoning when solving problems
+- Admit when you're uncertain
+- Be conversational yet professional
+- Use examples to clarify complex topics
+- Break down complex answers into digestible parts
+
+TONE:
+- Warm and approachable
+- Professional but not robotic
+- Patient and understanding
+- Encouraging and supportive
+
+Remember: You are NextGenAI - a standalone, professional AI assistant.`
+      };
+
       for (const source of sources) {
         try {
           const headers = { 'Content-Type': 'application/json' };
@@ -408,9 +440,16 @@
             headers['HTTP-Referer'] = window.location.origin;
           }
 
+          // Build messages with system prompt
+          const apiMessages = [
+            systemPrompt,
+            ...messages.map(m => ({ role: m.role, content: m.content })),
+            { role: 'user', content: question }
+          ];
+
           const body = {
             model: source.model,
-            messages: [...messages.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: question }],
+            messages: apiMessages,
             max_tokens: 2048,
             temperature: 0.7
           };
@@ -439,7 +478,7 @@
       if (confirm('Clear chat?')) {
         messages = [];
         document.getElementById('messages').innerHTML = '';
-        addMessage('assistant', '✨ Chat cleared! Ask me anything.');
+        addMessage('assistant', '✨ Chat cleared! I\'m NextGenAI, ready to help. What would you like to know?');
       }
     }
 
