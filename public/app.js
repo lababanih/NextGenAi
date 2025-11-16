@@ -237,17 +237,21 @@ async function handleNefaQuery(message) {
 
 // Mou: Research AI with web search
 async function handleMouQuery(message) {
+  let queryMessage = message;
+  
   // Check if query needs web search
   const needsSearch = detectSearchIntent(message);
   
   if (needsSearch) {
     updateStatus('Searching the web...');
     
-    // Perform web search
-    const searchResults = await performWebSearch(message);
-    
-    // Enhance query with search results
-    const enhancedMessage = `
+    try {
+      // Perform web search
+      const searchResults = await performWebSearch(message);
+      
+      if (searchResults.length > 0) {
+        // Enhance query with search results
+        queryMessage = `
 ${message}
 
 Here are recent search results to help answer:
@@ -255,12 +259,16 @@ ${searchResults.map((r, i) => `${i+1}. ${r.title}: ${r.snippet}`).join('\n')}
 
 Please provide a comprehensive answer using these sources.
 `;
-    
-    conversationHistory[conversationHistory.length - 1].content = enhancedMessage;
+        
+        conversationHistory[conversationHistory.length - 1].content = queryMessage;
+      }
+    } catch (error) {
+      console.warn('Web search failed, continuing with normal query:', error);
+    }
   }
   
   // Query AI with enhanced context
-  return await handleNefaQuery(enhancedMessage || message);
+  return await handleNefaQuery(queryMessage);
 }
 
 // Nevi: Image generation
