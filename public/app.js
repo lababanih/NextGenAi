@@ -1,20 +1,48 @@
-// NextGenAI - PERFECT VERSION
-// No more errors, clean artifacts, multi-model support
+// NextGenAI - ULTIMATE VERSION
+// Model-specific capabilities, better formatting
 
 let messages = [];
 let isLoading = false;
 let aiSources = [];
-let selectedModel = 'sonnet'; // sonnet or haiku
-let enabledTools = {
-  artifacts: true,
-  websearch: false
-};
+let selectedModel = 'sonnet';
 let artifactCount = 0;
 
-// Initialize
+const MODEL_INFO = {
+  sonnet: {
+    name: 'Sonnet',
+    description: 'General purpose, balanced & smart',
+    capabilities: ['chat', 'code', 'analysis'],
+    icon: '🧠'
+  },
+  mou: {
+    name: 'Mou',
+    description: 'Web search, code, deep research',
+    capabilities: ['search', 'code', 'research'],
+    icon: '🔍'
+  },
+  nevi: {
+    name: 'Nevi',
+    description: 'Image generation',
+    capabilities: ['image_generation'],
+    icon: '🎨'
+  },
+  vidi: {
+    name: 'Vidi',
+    description: 'Video generation',
+    capabilities: ['video_generation'],
+    icon: '🎬',
+    comingSoon: true
+  }
+};
+
 function init() {
   loadSources();
-  loadSettings();
+  const savedModel = localStorage.getItem('selected_model');
+  if (savedModel) {
+    selectedModel = savedModel;
+    updateModelDisplay();
+  }
+  
   if (aiSources.length === 0 || !aiSources.some(s => s.apiKey)) {
     showAdminWarning();
   }
@@ -27,14 +55,6 @@ function loadSources() {
   }
 }
 
-function loadSettings() {
-  const savedModel = localStorage.getItem('selected_model');
-  if (savedModel) selectedModel = savedModel;
-  
-  const savedTools = localStorage.getItem('enabled_tools');
-  if (savedTools) enabledTools = JSON.parse(savedTools);
-}
-
 function showAdminWarning() {
   const banner = document.createElement('div');
   banner.className = 'bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg mb-4';
@@ -43,43 +63,40 @@ function showAdminWarning() {
 }
 
 // UI Functions
-function toggleTools() {
-  const dropdown = document.getElementById('toolsDropdown');
-  const modelDropdown = document.getElementById('modelDropdown');
-  dropdown.classList.toggle('hidden');
-  modelDropdown.classList.add('hidden');
-}
-
-function toggleModels() {
-  const dropdown = document.getElementById('modelDropdown');
-  const toolsDropdown = document.getElementById('toolsDropdown');
-  dropdown.classList.toggle('hidden');
-  toolsDropdown.classList.add('hidden');
-}
-
-function toggleTool(toolId, event) {
-  event.stopPropagation();
-  if (toolId === 'artifacts') return;
-  
-  enabledTools[toolId] = !enabledTools[toolId];
-  document.getElementById(`tool-${toolId}`).checked = enabledTools[toolId];
-  localStorage.setItem('enabled_tools', JSON.stringify(enabledTools));
+function toggleModelSelector() {
+  const selector = document.getElementById('modelSelector');
+  selector.classList.toggle('hidden');
 }
 
 function selectModel(model, event) {
   event.stopPropagation();
+  
+  if (MODEL_INFO[model].comingSoon) {
+    alert('🎬 Vidi model coming soon! Stay tuned.');
+    return;
+  }
+  
   selectedModel = model;
   localStorage.setItem('selected_model', model);
+  updateModelDisplay();
   
-  document.getElementById('selectedModel').textContent = 
-    model.charAt(0).toUpperCase() + model.slice(1);
-  
+  // Update active state
   document.querySelectorAll('.model-item').forEach(item => {
     item.classList.remove('active');
   });
   event.currentTarget.classList.add('active');
   
-  document.getElementById('modelDropdown').classList.add('hidden');
+  document.getElementById('modelSelector').classList.add('hidden');
+  
+  // Show model change message
+  const modelInfo = MODEL_INFO[model];
+  addMessage('system', `Switched to ${modelInfo.icon} ${modelInfo.name}: ${modelInfo.description}`);
+}
+
+function updateModelDisplay() {
+  const modelInfo = MODEL_INFO[selectedModel];
+  document.getElementById('currentModelName').textContent = modelInfo.name;
+  document.getElementById('modelInfo').textContent = `Using: ${modelInfo.name}`;
 }
 
 function handleKeyPress(event) {
@@ -100,13 +117,14 @@ function scrollToBottom() {
 }
 
 function showLoading() {
+  const modelInfo = MODEL_INFO[selectedModel];
   const container = document.getElementById('messages');
   const loadingDiv = document.createElement('div');
   loadingDiv.id = 'loadingIndicator';
   loadingDiv.className = 'flex gap-3';
   loadingDiv.innerHTML = `
     <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0">
-      <span class="text-white">🧠</span>
+      <span class="text-white">${modelInfo.icon}</span>
     </div>
     <div class="flex-1">
       <div class="px-4 py-3 rounded-2xl bg-white shadow-sm border">
@@ -118,7 +136,7 @@ function showLoading() {
   `;
   container.appendChild(loadingDiv);
   scrollToBottom();
-  document.getElementById('statusText').textContent = 'Creating...';
+  document.getElementById('statusText').textContent = `${modelInfo.name} is thinking...`;
 }
 
 function hideLoading() {
@@ -138,7 +156,7 @@ function clearChat() {
         </div>
         <div class="flex-1">
           <div class="px-4 py-3 rounded-2xl bg-white shadow-sm border">
-            <p class="text-sm">Chat cleared! Ready to create something amazing? 🚀</p>
+            <p class="text-sm message-content">Chat cleared! Ready to create something amazing? 🚀</p>
           </div>
         </div>
       </div>
@@ -148,25 +166,40 @@ function clearChat() {
 
 // Message Functions
 function addMessage(role, content, options = {}) {
-  messages.push({ role, content });
+  if (role !== 'system') {
+    messages.push({ role, content });
+  }
+  
   const container = document.getElementById('messages');
   const msg = document.createElement('div');
-  msg.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''}`;
   
-  const avatar = role === 'user' 
-    ? '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center flex-shrink-0"><span class="text-white">👤</span></div>'
-    : '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0"><span class="text-white">🧠</span></div>';
+  let avatar, bgColor, icon;
   
-  const bgColor = role === 'user' ? 'bg-blue-50 border-blue-200' : 'bg-white border-purple-100';
+  if (role === 'user') {
+    avatar = '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center flex-shrink-0"><span class="text-white">👤</span></div>';
+    bgColor = 'bg-blue-50 border-blue-200';
+    msg.className = 'flex gap-3 flex-row-reverse';
+  } else if (role === 'system') {
+    avatar = '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center flex-shrink-0"><span class="text-white">ℹ️</span></div>';
+    bgColor = 'bg-gray-50 border-gray-200';
+    msg.className = 'flex gap-3';
+  } else {
+    icon = MODEL_INFO[selectedModel]?.icon || '🧠';
+    avatar = `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0"><span class="text-white">${icon}</span></div>`;
+    bgColor = 'bg-white border-purple-100';
+    msg.className = 'flex gap-3';
+  }
   
   if (options.artifact) {
     msg.innerHTML = `${avatar}<div class="flex-1 min-w-0">${renderArtifact(options.artifact)}</div>`;
   } else {
+    // Format content with markdown-like styling
+    const formattedContent = formatResponse(content);
     msg.innerHTML = `
       ${avatar}
       <div class="flex-1 min-w-0">
         <div class="px-4 py-3 rounded-2xl ${bgColor} shadow-sm border">
-          <p class="text-sm message-content">${escapeHtml(content)}</p>
+          <div class="text-sm message-content">${formattedContent}</div>
         </div>
       </div>
     `;
@@ -176,37 +209,72 @@ function addMessage(role, content, options = {}) {
   scrollToBottom();
 }
 
+function formatResponse(text) {
+  // Better formatting for AI responses
+  let formatted = escapeHtml(text);
+  
+  // Bold text: **text** or __text__
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  formatted = formatted.replace(/__(.*?)__/g, '<strong>$1</strong>');
+  
+  // Italic: *text* or _text_
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  formatted = formatted.replace(/_(.*?)_/g, '<em>$1</em>');
+  
+  // Inline code: `code`
+  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // Line breaks
+  formatted = formatted.replace(/\n\n/g, '</p><p>');
+  formatted = formatted.replace(/\n/g, '<br>');
+  
+  // Bullet points
+  formatted = formatted.replace(/^[•\-\*]\s+(.+)$/gm, '<li>$1</li>');
+  formatted = formatted.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  
+  // Numbered lists
+  formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+  
+  // Wrap in paragraphs if not already
+  if (!formatted.startsWith('<')) {
+    formatted = '<p>' + formatted + '</p>';
+  }
+  
+  return formatted;
+}
+
 function renderArtifact(artifact) {
   artifactCount++;
   const id = `artifact-${artifactCount}`;
+  const modelIcon = MODEL_INFO[selectedModel]?.icon || '🎨';
   
   return `
     <div class="artifact-container">
       <div class="artifact-header">
         <div class="flex items-center gap-2">
-          <span class="text-2xl">🎨</span>
+          <span class="text-2xl">${modelIcon}</span>
           <div>
             <h3 class="text-white font-semibold text-sm">${artifact.title}</h3>
-            <p class="text-purple-200 text-xs">${artifact.type.toUpperCase()}</p>
+            <p class="text-purple-200 text-xs">${artifact.type.toUpperCase()} • Generated by ${MODEL_INFO[selectedModel].name}</p>
           </div>
         </div>
-        <div class="flex gap-2">
-          <button onclick="copyCode('${id}')" class="px-3 py-1.5 bg-white text-purple-600 rounded text-sm hover:bg-purple-50">
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="copyCode('${id}')" class="px-3 py-1.5 bg-white text-purple-600 rounded text-sm hover:bg-purple-50 transition-colors">
             📋 Copy
           </button>
-          <button onclick="downloadCode('${id}', '${escapeHtml(artifact.title)}')" class="px-3 py-1.5 bg-white text-purple-600 rounded text-sm hover:bg-purple-50">
+          <button onclick="downloadCode('${id}', '${escapeHtml(artifact.title)}')" class="px-3 py-1.5 bg-white text-purple-600 rounded text-sm hover:bg-purple-50 transition-colors">
             💾 Download
           </button>
         </div>
       </div>
       
       <div class="artifact-tabs">
-        <div class="artifact-tab active" onclick="switchTab('${id}', 'preview')">👁️ Preview</div>
-        <div class="artifact-tab" onclick="switchTab('${id}', 'code')">💻 Code</div>
+        <div class="artifact-tab active" onclick="switchTab('${id}', 'preview', event)">👁️ Preview</div>
+        <div class="artifact-tab" onclick="switchTab('${id}', 'code', event)">💻 Code</div>
       </div>
       
       <div id="${id}-preview" class="artifact-preview">
-        <iframe class="w-full h-full border-0" sandbox="allow-scripts allow-same-origin allow-forms" srcdoc="${escapeHtml(artifact.code)}"></iframe>
+        <iframe class="w-full h-full border-0" style="min-height: 400px;" sandbox="allow-scripts allow-same-origin allow-forms" srcdoc="${escapeHtml(artifact.code)}"></iframe>
       </div>
       <div id="${id}-code" class="hidden">
         <div class="artifact-code">${escapeHtml(artifact.code)}</div>
@@ -216,23 +284,22 @@ function renderArtifact(artifact) {
   `;
 }
 
-function switchTab(id, tab) {
-  document.querySelectorAll(`#${id}-preview, #${id}-code`).forEach(el => {
-    el.classList.add('hidden');
-  });
-  document.getElementById(`${id}-${tab}`).classList.remove('hidden');
+function switchTab(id, tab, event) {
+  event.stopPropagation();
   
-  const tabs = document.querySelectorAll(`#${id}-preview`).forEach((_, i, arr) => {
-    const container = arr[0].closest('.artifact-container');
-    container.querySelectorAll('.artifact-tab').forEach(t => t.classList.remove('active'));
-  });
+  document.getElementById(`${id}-preview`).classList.toggle('hidden', tab !== 'preview');
+  document.getElementById(`${id}-code`).classList.toggle('hidden', tab !== 'code');
   
+  const container = document.getElementById(`${id}-preview`).closest('.artifact-container');
+  container.querySelectorAll('.artifact-tab').forEach(t => t.classList.remove('active'));
   event.currentTarget.classList.add('active');
 }
 
 function copyCode(id) {
   const code = window[`code_${id}`];
-  navigator.clipboard.writeText(code).then(() => alert('✅ Copied!'));
+  navigator.clipboard.writeText(code).then(() => {
+    alert('✅ Code copied to clipboard!');
+  });
 }
 
 function downloadCode(id, title) {
@@ -265,60 +332,127 @@ async function sendMessage() {
       throw new Error('NO_CONFIG');
     }
 
-    const wantsArtifact = /create|build|make|generate|buat|bikin/i.test(question);
+    const result = await processWithModel(question);
+    hideLoading();
     
-    if (wantsArtifact) {
-      const result = await generateArtifact(question);
-      hideLoading();
-      
-      if (result.artifact) {
-        if (result.explanation) {
-          addMessage('assistant', result.explanation);
-        }
-        addMessage('assistant', '', { artifact: result.artifact });
-      } else {
-        addMessage('assistant', result.answer || 'Failed to generate. Please be more specific.');
+    if (result.artifact) {
+      if (result.explanation) {
+        addMessage('assistant', result.explanation);
       }
+      addMessage('assistant', '', { artifact: result.artifact });
     } else {
-      const result = await queryAI(question);
-      hideLoading();
       addMessage('assistant', result.answer);
     }
   } catch (error) {
     hideLoading();
     console.error(error);
     addMessage('assistant', error.message === 'NO_CONFIG' 
-      ? '🔧 System not configured. Contact administrator.'
+      ? '🔧 System not configured. Please contact administrator.'
       : '😔 Sorry, an error occurred. Please try again.');
   } finally {
     isLoading = false;
   }
 }
 
-// AI Functions
+// Model-Specific Processing
+async function processWithModel(question) {
+  const modelInfo = MODEL_INFO[selectedModel];
+  
+  switch (selectedModel) {
+    case 'mou':
+      return await processMou(question);
+    case 'nevi':
+      return await processNevi(question);
+    case 'vidi':
+      return { answer: '🎬 Vidi model is coming soon! Please use another model for now.' };
+    default:
+      return await processSonnet(question);
+  }
+}
+
+// Mou: Search, Code, Research
+async function processMou(question) {
+  const needsCode = /create|build|make|generate|buat|bikin|code|program/i.test(question);
+  
+  if (needsCode) {
+    return await generateArtifact(question);
+  } else {
+    // Regular response with research capability
+    return await queryAI(question, {
+      systemPrompt: `You are Mou, an AI specialized in web search, coding, and deep research. 
+
+Provide comprehensive, well-researched answers with:
+- Clear structure with headings
+- Bullet points for lists
+- Code examples when relevant
+- Citations when appropriate
+
+Format your response using:
+- **Bold** for emphasis
+- \`code\` for inline code
+- Bullet points with • or -
+- Numbered lists when order matters
+
+Be thorough but concise.`
+    });
+  }
+}
+
+// Nevi: Image Generation
+async function processNevi(question) {
+  // Extract image description
+  const description = question.replace(/generate|create|make|buat|gambar|image/gi, '').trim();
+  
+  // Generate image URL (using Pollinations.ai - FREE)
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(description)}?width=1024&height=1024&seed=${Date.now()}`;
+  
+  return {
+    answer: `**🎨 Image Generated**\n\nPrompt: *${description}*\n\n![Generated Image](${imageUrl})\n\nCreated by Nevi AI`,
+    artifact: null
+  };
+}
+
+// Sonnet: General Purpose
+async function processSonnet(question) {
+  const needsCode = /create|build|make|generate|buat|bikin/i.test(question);
+  
+  if (needsCode) {
+    return await generateArtifact(question);
+  } else {
+    return await queryAI(question, {
+      systemPrompt: `You are Sonnet, a balanced and intelligent AI assistant.
+
+Provide helpful, accurate responses with:
+- Clear explanations
+- Well-structured information
+- Examples when helpful
+- Professional tone
+
+Format using:
+- **Bold** for key points
+- Bullet points for lists
+- Clear paragraphs
+- \`code\` when relevant`
+    });
+  }
+}
+
+// Generate Artifact (Code)
 async function generateArtifact(prompt) {
   const source = getSource();
   if (!source) throw new Error('NO_CONFIG');
 
-  const systemPrompt = `You are a code generator. Generate ONLY complete HTML code.
+  const systemPrompt = `You are a code generator. Generate ONLY complete, working HTML code.
 
 RULES:
 1. Start immediately with <!DOCTYPE html>
-2. NO explanations, NO JSON, NO markdown
+2. NO explanations, NO JSON, NO markdown blocks
 3. Include Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
-4. Make it beautiful and functional
-5. All CSS/JS inline
+4. Make it beautiful, modern, and fully functional
+5. All CSS/JS must be inline
+6. Production-ready quality
 
-Example for "create button":
-<!DOCTYPE html>
-<html>
-<head>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="flex items-center justify-center min-h-screen bg-gray-100">
-<button class="px-8 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Click Me</button>
-</body>
-</html>`;
+Generate ONLY the HTML code, nothing else.`;
 
   try {
     const response = await fetch(source.endpoint, {
@@ -343,37 +477,41 @@ Example for "create button":
     const data = await response.json();
     let code = data.choices[0].message.content.trim();
     
-    // Clean markdown if present
+    // Clean markdown
     code = code.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
     
-    // Extract HTML if wrapped in text
+    // Extract HTML
     if (!code.startsWith('<!DOCTYPE')) {
       const match = code.match(/<!DOCTYPE[\s\S]*<\/html>/i);
       if (match) code = match[0];
     }
     
-    // Validate HTML
+    // Validate
     if (!code.includes('<!DOCTYPE') && !code.includes('<html')) {
-      return { answer: 'Failed to generate valid HTML. Please try again.' };
+      return { answer: '❌ Failed to generate valid code. Please try with more specific details.' };
     }
     
     const titleMatch = code.match(/<title>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1] : 'Generated Code';
+    const title = titleMatch ? titleMatch[1] : 'Generated App';
     
     return {
-      explanation: "I've created what you requested:",
+      explanation: "**✨ I've created what you requested:**",
       artifact: { title, type: 'html', code }
     };
     
   } catch (error) {
     console.error(error);
-    return { answer: 'Failed to generate. Please try again with more details.' };
+    return { answer: '❌ Failed to generate. Please try again.' };
   }
 }
 
-async function queryAI(question) {
+// Query AI (Regular chat)
+async function queryAI(question, options = {}) {
   const source = getSource();
   if (!source) throw new Error('NO_CONFIG');
+
+  const defaultPrompt = 'You are a helpful AI assistant. Be concise and professional.';
+  const systemPrompt = options.systemPrompt || defaultPrompt;
 
   try {
     const response = await fetch(source.endpoint, {
@@ -385,7 +523,7 @@ async function queryAI(question) {
       body: JSON.stringify({
         model: source.model,
         messages: [
-          { role: 'system', content: 'You are NextGenAI, a helpful assistant. Be concise.' },
+          { role: 'system', content: systemPrompt },
           ...messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
         ],
         temperature: 0.7,
@@ -404,12 +542,7 @@ async function queryAI(question) {
 }
 
 function getSource() {
-  // Prioritize based on selected model
-  if (selectedModel === 'haiku') {
-    // Use fastest available model
-    return aiSources.find(s => s.model.includes('llama-3.1')) || aiSources[0];
-  }
-  // Sonnet: use best available
+  // Use best available source
   return aiSources.find(s => s.model.includes('3.3') || s.model.includes('3.2')) || aiSources[0];
 }
 
