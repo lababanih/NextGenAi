@@ -688,11 +688,22 @@ function copyArtifact(artifactId) {
   const code = container.dataset.code;
   
   navigator.clipboard.writeText(code).then(() => {
-    updateStatus('✅ Code copied to clipboard!');
-    setTimeout(() => updateStatus('Ready'), 2000);
+    // Show beautiful notification
+    showNotification('✅ Code copied to clipboard!', 'success');
+    
+    // Animate button
+    const button = event.target.closest('button');
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<span>✓</span> Copied!';
+    button.classList.add('bg-green-500');
+    
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.classList.remove('bg-green-500');
+    }, 2000);
   }).catch(err => {
     console.error('Copy failed:', err);
-    updateStatus('❌ Copy failed');
+    showNotification('❌ Copy failed', 'error');
   });
 }
 
@@ -702,13 +713,19 @@ function downloadArtifact(artifactId, language) {
   
   const extensions = {
     'javascript': 'js',
+    'typescript': 'ts',
     'python': 'py',
     'lua': 'lua',
     'html': 'html',
     'css': 'css',
     'java': 'java',
     'cpp': 'cpp',
-    'csharp': 'cs'
+    'c++': 'cpp',
+    'csharp': 'cs',
+    'c#': 'cs',
+    'go': 'go',
+    'rust': 'rs',
+    'sql': 'sql'
   };
   
   const ext = extensions[language.toLowerCase()] || 'txt';
@@ -722,8 +739,25 @@ function downloadArtifact(artifactId, language) {
   a.click();
   URL.revokeObjectURL(url);
   
-  updateStatus(`✅ Downloaded as ${filename}`);
-  setTimeout(() => updateStatus('Ready'), 2000);
+  showNotification(`✅ Downloaded as ${filename}`, 'success');
+}
+
+function showNotification(message, type = 'success') {
+  // Remove existing notification
+  const existing = document.querySelector('.copy-notification');
+  if (existing) existing.remove();
+  
+  const notification = document.createElement('div');
+  notification.className = 'copy-notification';
+  notification.style.background = type === 'success' ? '#10b981' : '#ef4444';
+  notification.textContent = message;
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-in';
+    setTimeout(() => notification.remove(), 300);
+  }, 2500);
 }
 
 // ========================================
