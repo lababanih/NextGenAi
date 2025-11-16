@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NextGenAI Diagnostic</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+      <h1 class="text-3xl font-bold mb-6 text-purple-600">🔍 NextGenAI Diagnostic Tool</h1>
+      
+      <div class="space-y-6">
+        
+        <!-- AI Sources Check -->
+        <div class="border-l-4 border-blue-500 pl-4">
+          <h2 class="text-xl font-bold mb-2">1. AI Sources Configuration</h2>
+          <div id="sourcesCheck" class="text-gray-600">Checking...</div>
+        </div>
+
+        <!-- API Endpoint Check -->
+        <div class="border-l-4 border-green-500 pl-4">
+          <h2 class="text-xl font-bold mb-2">2. API Endpoints</h2>
+          <div id="endpointsCheck" class="text-gray-600">Checking...</div>
+        </div>
+
+        <!-- Test Connection -->
+        <div class="border-l-4 border-orange-500 pl-4">
+          <h2 class="text-xl font-bold mb-2">3. Test Connection</h2>
+          <button 
+            onclick="testConnection()" 
+            class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            🧪 Run Test
+          </button>
+          <div id="testResult" class="mt-4"></div>
+        </div>
+
+        <!-- Quick Fix -->
+        <div class="border-l-4 border-red-500 pl-4">
+          <h2 class="text-xl font-bold mb-2">4. Quick Actions</h2>
+          <div class="space-x-2">
+            <a href="/admin.html" class="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+              ⚙️ Go to Admin Panel
+            </a>
+            <button 
+              onclick="clearStorage()" 
+              class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              🗑️ Clear Storage
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check AI sources
+    function checkSources() {
+      const sources = localStorage.getItem('ai_sources');
+      const sourcesDiv = document.getElementById('sourcesCheck');
+      
+      if (!sources) {
+        sourcesDiv.innerHTML = `
+          <div class="text-red-600 font-semibold">❌ No AI sources configured</div>
+          <p class="text-sm mt-2">Go to <a href="/admin.html" class="text-blue-600 underline">Admin Panel</a> to configure API keys.</p>
+        `;
+        return false;
+      }
+
+      try {
+        const parsed = JSON.parse(sources);
+        const enabled = parsed.filter(s => s.enabled && s.apiKey && s.apiKey.length > 5);
+        
+        if (enabled.length === 0) {
+          sourcesDiv.innerHTML = `
+            <div class="text-orange-600 font-semibold">⚠️ No enabled AI sources with valid API keys</div>
+            <p class="text-sm mt-2">Found ${parsed.length} sources but none are enabled with API keys.</p>
+            <details class="mt-2 text-xs">
+              <summary class="cursor-pointer text-blue-600">Show details</summary>
+              <pre class="bg-gray-100 p-2 rounded mt-2 overflow-x-auto">${JSON.stringify(parsed, null, 2)}</pre>
+            </details>
+          `;
+          return false;
+        }
+
+        sourcesDiv.innerHTML = `
+          <div class="text-green-600 font-semibold">✅ ${enabled.length} AI source(s) configured and enabled</div>
+          <ul class="text-sm mt-2 space-y-1">
+            ${enabled.map(s => `
+              <li>• <strong>${s.name}</strong> (${s.provider}) - Priority: ${s.priority}</li>
+            `).join('')}
+          </ul>
+        `;
+        return true;
+      } catch (error) {
+        sourcesDiv.innerHTML = `
+          <div class="text-red-600 font-semibold">❌ Invalid AI sources data</div>
+          <p class="text-sm mt-2">Error: ${error.message}</p>
+        `;
+        return false;
+      }
+    }
+
+    // Check API endpoints
+    function checkEndpoints() {
+      const endpointsDiv = document.getElementById('endpointsCheck');
+      const endpoints = [
+        { name: 'Chat API', path: '/api/chat' },
+        { name: 'Tools API', path: '/api/tools' },
+        { name: 'Admin Sources', path: '/api/admin/sources' }
+      ];
+
+      endpointsDiv.innerHTML = `
+        <div class="text-sm space-y-1">
+          ${endpoints.map(e => `
+            <div>• ${e.name}: <code class="bg-gray-100 px-2 py-1 rounded">${e.path}</code></div>
+          `).join('')}
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Endpoints are serverless functions on Vercel</p>
+      `;
+    }
+
+    // Test connection
+    async function testConnection() {
+      const resultDiv = document.getElementById('testResult');
+      resultDiv.innerHTML = '<div class="text-blue-600">⏳ Testing connection...</div>';
+
+      try {
+        // Get AI sources
+        const sources = localStorage.getItem('ai_sources');
+        if (!sources) {
+          throw new Error('No AI sources configured');
+        }
+
+        const parsed = JSON.parse(sources);
+        const enabled = parsed.filter(s => s.enabled && s.apiKey && s.apiKey.length > 5);
+
+        if (enabled.length === 0) {
+          throw new Error('No enabled AI sources with valid API keys');
+        }
+
+        // Test chat endpoint
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: 'Say hello in one word' }],
+            aiSources: enabled,
+            mode: 'fast'
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        resultDiv.innerHTML = `
+          <div class="text-green-600 font-semibold">✅ Connection successful!</div>
+          <div class="bg-gray-100 p-4 rounded mt-2">
+            <strong>AI Response:</strong>
+            <p class="mt-2">${data.answer}</p>
+            <div class="text-xs text-gray-600 mt-2">
+              <div>Mode: ${data.mode}</div>
+              <div>Source: ${data.source || data.sources?.join(', ')}</div>
+              <div>Confidence: ${data.confidence || 'N/A'}%</div>
+            </div>
+          </div>
+        `;
+
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="text-red-600 font-semibold">❌ Connection failed</div>
+          <div class="bg-red-50 border border-red-200 p-4 rounded mt-2">
+            <strong>Error:</strong>
+            <pre class="text-sm mt-2 whitespace-pre-wrap">${error.message}</pre>
+          </div>
+          <div class="mt-4 space-y-2 text-sm">
+            <strong>Possible solutions:</strong>
+            <ul class="list-disc ml-5 space-y-1">
+              <li>Check API keys in Admin Panel</li>
+              <li>Verify API keys are valid (not expired)</li>
+              <li>Check API rate limits</li>
+              <li>Verify internet connection</li>
+              <li>Check Vercel deployment logs</li>
+            </ul>
+          </div>
+        `;
+      }
+    }
+
+    // Clear storage
+    function clearStorage() {
+      if (confirm('This will clear all AI sources configuration. Continue?')) {
+        localStorage.removeItem('ai_sources');
+        localStorage.removeItem('admin_password');
+        alert('Storage cleared! Please reconfigure in Admin Panel.');
+        location.reload();
+      }
+    }
+
+    // Initialize
+    checkSources();
+    checkEndpoints();
+  </script>
+</body>
+</html>
