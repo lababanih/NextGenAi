@@ -1,6 +1,6 @@
 // api/chat.js
-// ULTIMATE COMPLETE SYSTEM GENERATOR
-// Generates 100% complete multi-file solutions like Claude Sonnet 4.5
+// Hybrid Strategy: Smart model routing + Multi-API key load balancing
+// Automatically selects best model based on complexity
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,47 +22,139 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Messages array required' });
     }
 
-    let enabledProviders = getEnabledProviders(aiSources);
+    // Get all configured providers
+    let allProviders = getEnabledProviders(aiSources);
 
-    if (enabledProviders.length === 0) {
+    if (allProviders.length === 0) {
       return res.status(500).json({
-        error: 'No AI providers configured',
-        message: 'Please configure at least one AI source in Admin Panel'
+        error: 'No AI providers configured'
       });
     }
 
-    console.log(`🎯 ULTIMATE MODE: ${enabledProviders.length} AI provider(s) ready`);
+    console.log(`🎯 Available providers: ${allProviders.length}`);
 
-    // Detect language
+    // Detect language & analyze complexity
     const userLanguage = detectLanguage(messages[messages.length - 1].content);
-    
-    // Analyze complexity
     const complexity = analyzeComplexity(messages[messages.length - 1].content);
-    console.log(`📊 Complexity: ${complexity.level}, Files: ${complexity.filesNeeded}`);
+    
+    console.log(`📊 Complexity: ${complexity.level}, Estimated tokens needed: ${complexity.tokensNeeded}`);
 
-    // Create ULTIMATE system prompt
+    // SMART ROUTING: Select best provider(s) based on complexity
+    const selectedProviders = smartRouting(allProviders, complexity);
+    
+    console.log(`🚀 Selected: ${selectedProviders.map(p => `${p.name} (${p.maxTokens} tokens)`).join(', ')}`);
+
+    // Create enhanced prompt
     const enhancedMessages = createUltimatePrompt(messages, userLanguage, complexity);
 
-    // Query AI with ULTIMATE settings
-    const result = await queryWithUltimateSettings(enabledProviders, enhancedMessages);
+    // Execute with selected strategy
+    let result;
+    
+    if (complexity.tokensNeeded > 16000) {
+      // MULTI-TURN strategy for very complex requests
+      console.log('📚 Using MULTI-TURN generation strategy...');
+      result = await multiTurnGeneration(selectedProviders, enhancedMessages, complexity);
+    } else {
+      // SINGLE-TURN with best model
+      console.log('⚡ Using SINGLE-TURN generation strategy...');
+      result = await singleTurnGeneration(selectedProviders, enhancedMessages);
+    }
     
     return res.json({
       answer: result.answer,
-      mode: 'ultimate-complete',
-      source: result.sourceName,
-      confidence: 100,
+      mode: result.mode,
+      provider: result.provider,
+      tokensUsed: result.tokensUsed,
+      confidence: result.confidence,
       language: userLanguage,
-      complexity: complexity.level,
-      filesGenerated: complexity.filesNeeded
+      complexity: complexity.level
     });
 
   } catch (error) {
-    console.error('❌ Ultimate generation error:', error);
+    console.error('❌ Generation error:', error);
     return res.status(500).json({
       error: 'AI request failed',
       message: error.message
     });
   }
+}
+
+// ========================================
+// SMART ROUTING: Select best provider
+// ========================================
+
+function smartRouting(providers, complexity) {
+  const tokensNeeded = complexity.tokensNeeded;
+  
+  // Group providers by same model (for load balancing)
+  const groupedByModel = {};
+  
+  providers.forEach(provider => {
+    const key = `${provider.provider}-${provider.model}`;
+    if (!groupedByModel[key]) {
+      groupedByModel[key] = [];
+    }
+    groupedByModel[key].push(provider);
+  });
+  
+  // Rank models by max_tokens capability
+  const rankedGroups = Object.values(groupedByModel).map(group => {
+    const sample = group[0];
+    const maxTokens = getModelMaxTokens(sample.provider, sample.model);
+    
+    return {
+      providers: group,
+      maxTokens,
+      model: sample.model,
+      provider: sample.provider
+    };
+  }).sort((a, b) => b.maxTokens - a.maxTokens);
+  
+  // Select providers that can handle the complexity
+  const suitable = rankedGroups.filter(g => g.maxTokens >= tokensNeeded);
+  
+  if (suitable.length === 0) {
+    console.warn('⚠️ No provider can handle tokens needed, using largest available');
+    return rankedGroups[0].providers;
+  }
+  
+  // Return all API keys for the best model (for load balancing)
+  return suitable[0].providers;
+}
+
+function getModelMaxTokens(provider, model) {
+  // Model-specific max_tokens
+  const limits = {
+    // Groq models (FREE!)
+    'llama-3.3-70b-versatile': 32000,
+    'llama-3.1-70b-versatile': 8000,
+    'llama-3.2-90b-vision-preview': 8000,
+    
+    // OpenRouter models
+    'openai/gpt-4-turbo': 128000,
+    'openai/gpt-4': 8192,
+    'openai/gpt-3.5-turbo': 16385,
+    'anthropic/claude-3-opus': 200000,
+    'anthropic/claude-3.5-sonnet': 200000,
+    'google/gemini-pro-1.5': 1000000,
+    
+    // HuggingFace models
+    'mistralai/Mistral-7B-Instruct-v0.2': 8000,
+  };
+  
+  // Check exact match
+  if (limits[model]) return limits[model];
+  
+  // Check by provider default
+  const providerDefaults = {
+    'groq': 8000,
+    'openrouter': 8000,
+    'openai': 8000,
+    'anthropic': 100000,
+    'huggingface': 8000
+  };
+  
+  return providerDefaults[provider] || 4096;
 }
 
 // ========================================
@@ -72,35 +164,183 @@ export default async function handler(req, res) {
 function analyzeComplexity(text) {
   const lowerText = text.toLowerCase();
   
-  // Keywords that indicate comprehensive request
-  const comprehensiveKeywords = [
-    'lengkap', 'complete', 'full', 'seperti', 'like',
-    'kohl', 'claude', 'sonnet', 'gpt-4',
-    'production', 'produksi', 'professional'
-  ];
+  // Indicators of complexity
+  const fileKeywords = ['file', 'files', 'module', 'modul', 'terpisah', 'separate'];
+  const hasFileRequest = fileKeywords.some(k => lowerText.includes(k));
   
+  const comprehensiveKeywords = ['lengkap', 'complete', 'full', 'seperti', 'like', 'kohl', 'claude'];
   const isComprehensive = comprehensiveKeywords.some(k => lowerText.includes(k));
   
-  // Count features
   const numberedItems = (text.match(/\d+\./g) || []).length;
-  const bulletPoints = (text.match(/[-•*]\s/g) || []).length;
-  const featureWords = ['dengan', 'with', 'include', 'fitur', 'feature'].filter(w => lowerText.includes(w)).length;
+  const featureCount = ['dengan', 'with', 'include', 'fitur'].filter(w => lowerText.includes(w)).length;
   
+  // Estimate files needed
   let filesNeeded = 1;
-  let level = 'simple';
   
-  if (isComprehensive || numberedItems >= 5) {
+  if (text.match(/\d+\s*(file|files|modul)/i)) {
+    const match = text.match(/(\d+)\s*(file|files|modul)/i);
+    filesNeeded = parseInt(match[1]);
+  } else if (isComprehensive || numberedItems >= 5) {
     filesNeeded = 5;
-    level = 'comprehensive';
-  } else if (numberedItems >= 3 || featureWords >= 3) {
+  } else if (numberedItems >= 3) {
     filesNeeded = 3;
-    level = 'medium';
-  } else if (bulletPoints >= 2) {
+  } else if (hasFileRequest) {
     filesNeeded = 2;
-    level = 'basic';
   }
   
-  return { level, filesNeeded };
+  // Estimate tokens needed (rough calculation)
+  // Assume: 1 file ≈ 3000-5000 tokens
+  const tokensPerFile = 4000;
+  const tokensNeeded = filesNeeded * tokensPerFile + 2000; // +2000 for instructions & examples
+  
+  let level = 'simple';
+  if (tokensNeeded > 20000) level = 'very-complex';
+  else if (tokensNeeded > 12000) level = 'complex';
+  else if (tokensNeeded > 6000) level = 'medium';
+  else if (tokensNeeded > 3000) level = 'basic';
+  
+  return {
+    level,
+    filesNeeded,
+    tokensNeeded,
+    isComprehensive
+  };
+}
+
+// ========================================
+// SINGLE-TURN GENERATION
+// ========================================
+
+async function singleTurnGeneration(providers, messages) {
+  // Load balance across multiple API keys for same model
+  const selectedProvider = providers[Math.floor(Math.random() * providers.length)];
+  
+  console.log(`🎯 Using: ${selectedProvider.name} (Key #${providers.indexOf(selectedProvider) + 1}/${providers.length})`);
+  
+  try {
+    const result = await queryAIProvider(selectedProvider, messages);
+    
+    return {
+      answer: result.answer,
+      mode: 'single-turn',
+      provider: selectedProvider.name,
+      tokensUsed: estimateTokens(result.answer),
+      confidence: 95
+    };
+  } catch (error) {
+    // If failed, try next API key
+    if (providers.length > 1) {
+      console.warn(`⚠️ ${selectedProvider.name} failed, trying another API key...`);
+      const otherProviders = providers.filter(p => p !== selectedProvider);
+      return await singleTurnGeneration(otherProviders, messages);
+    }
+    throw error;
+  }
+}
+
+// ========================================
+// MULTI-TURN GENERATION (for very complex)
+// ========================================
+
+async function multiTurnGeneration(providers, messages, complexity) {
+  console.log(`📚 Splitting into ${complexity.filesNeeded} parts...`);
+  
+  const parts = [];
+  const filesPerPart = Math.ceil(complexity.filesNeeded / 3); // Max 3 turns
+  
+  for (let i = 0; i < Math.min(3, Math.ceil(complexity.filesNeeded / filesPerPart)); i++) {
+    const startFile = i * filesPerPart + 1;
+    const endFile = Math.min((i + 1) * filesPerPart, complexity.filesNeeded);
+    
+    console.log(`📝 Generating files ${startFile}-${endFile}...`);
+    
+    // Create focused prompt for this part
+    const partPrompt = createPartPrompt(messages, startFile, endFile, complexity);
+    
+    // Use load-balanced provider
+    const provider = providers[i % providers.length];
+    
+    try {
+      const result = await queryAIProvider(provider, [partPrompt]);
+      parts.push(result.answer);
+      
+      console.log(`✅ Part ${i + 1} done (${estimateTokens(result.answer)} tokens)`);
+    } catch (error) {
+      console.error(`❌ Part ${i + 1} failed:`, error.message);
+      throw error;
+    }
+  }
+  
+  // Combine all parts
+  const combined = parts.join('\n\n---\n\n');
+  
+  return {
+    answer: combined,
+    mode: 'multi-turn',
+    provider: `${providers[0].name} (${parts.length} calls)`,
+    tokensUsed: estimateTokens(combined),
+    confidence: 92
+  };
+}
+
+function createPartPrompt(originalMessages, startFile, endFile, complexity) {
+  const userMessage = originalMessages[originalMessages.length - 1].content;
+  const isIndonesian = detectLanguage(userMessage) === 'indonesian';
+  
+  return {
+    role: 'user',
+    content: isIndonesian ? `
+${userMessage}
+
+INSTRUKSI KHUSUS:
+Untuk request ini, tolong generate HANYA FILE ${startFile} sampai ${endFile} dari total ${complexity.filesNeeded} files.
+
+Generate dengan LENGKAP:
+- Setiap file 100% complete
+- Semua fungsi fully implemented
+- Error handling lengkap
+- Komentar Indonesia
+- Siap pakai
+
+Format:
+**FILE ${startFile}: [nama].lua**
+\`\`\`lua
+[FULL CODE]
+\`\`\`
+
+**FILE ${startFile + 1}: [nama].lua** (jika ada)
+\`\`\`lua
+[FULL CODE]
+\`\`\`
+
+Jangan generate file lain, fokus ${startFile}-${endFile} saja.
+` : `
+${userMessage}
+
+SPECIAL INSTRUCTION:
+For this request, please generate ONLY FILES ${startFile} to ${endFile} of ${complexity.filesNeeded} total files.
+
+Generate COMPLETELY:
+- Each file 100% complete
+- All functions fully implemented
+- Complete error handling
+- English comments
+- Production ready
+
+Format:
+**FILE ${startFile}: [name].lua**
+\`\`\`lua
+[FULL CODE]
+\`\`\`
+
+**FILE ${startFile + 1}: [name].lua** (if any)
+\`\`\`lua
+[FULL CODE]
+\`\`\`
+
+Don't generate other files, focus on ${startFile}-${endFile} only.
+`
+  };
 }
 
 // ========================================
@@ -110,349 +350,90 @@ function analyzeComplexity(text) {
 function createUltimatePrompt(messages, userLanguage, complexity) {
   const isIndonesian = userLanguage === 'indonesian';
   
-  const ultimatePrompt = {
+  const prompt = {
     role: 'system',
-    content: `You are Claude Sonnet 4.5 - the world's most advanced AI coding assistant. You generate COMPLETE, PRODUCTION-READY solutions that users can immediately deploy.
+    content: `You are Claude Sonnet 4.5 - world's best coding assistant.
 
 ${isIndonesian ? `
-# INSTRUKSI KRITIS (WAJIB DIIKUTI 100%)
+INSTRUKSI KRITIS:
 
-Kamu HARUS menghasilkan solusi yang LENGKAP seperti Claude Sonnet 4.5!
+Generate ${complexity.filesNeeded} file LENGKAP dan SIAP PAKAI!
 
-## ATURAN MUTLAK:
-
-### 1. GENERATE SEMUA FILE YANG DIBUTUHKAN (${complexity.filesNeeded} FILES)
-
-User meminta solusi lengkap, maka kamu HARUS buat ${complexity.filesNeeded} file COMPLETE:
-
-${complexity.filesNeeded >= 5 ? `
-**FILE 1: AdminConfig.lua** (100-150 lines)
-- Semua konfigurasi admin
-- Daftar admin dengan role & permission
-- UI settings
-- Cooldown settings
-- LENGKAP dan SIAP PAKAI
-
-**FILE 2: AdminCore.lua** (300-400 lines) 
-- SEMUA fungsi core logic
-- IsAdmin() - COMPLETE implementation
-- HasPermission() - COMPLETE implementation
-- KickPlayer() - COMPLETE with error handling
-- BanPlayer() - COMPLETE with error handling
-- TeleportPlayer() - COMPLETE
-- MutePlayer() - COMPLETE
-- GetAdminLevel() - COMPLETE
-- LogAction() - COMPLETE
-- CheckCooldown() - COMPLETE
-- [10+ more COMPLETE functions]
-- TIDAK BOLEH ADA "..." atau "tambahkan sendiri"
-
-**FILE 3: AdminUI.lua** (250-300 lines)
-- CreateMainFrame() - COMPLETE UI creation
-- CreatePlayerList() - COMPLETE scrolling list
-- CreateActionButtons() - COMPLETE all buttons
-- UpdatePlayerInfo() - COMPLETE info display
-- CreateNotification() - COMPLETE notification system
-- [5+ more COMPLETE UI functions]
-
-**FILE 4: AdminCommands.lua** (200-250 lines)
-- Command parser - COMPLETE
-- ExecuteCommand() - COMPLETE
-- Individual command handlers - ALL COMPLETE
-  - handleKick() - FULL implementation
-  - handleBan() - FULL implementation
-  - handleTeleport() - FULL implementation
-  - handleMute() - FULL implementation
-  - [10+ more commands FULLY implemented]
-
-**FILE 5: Main.lua** (150-200 lines)
-- Complete initialization
-- Event connections
-- Player join/leave handling
-- Error handling
-- Logging system
-- SEMUA TERINTEGRASI
-` : complexity.filesNeeded >= 3 ? `
-**FILE 1: Config Module** (100+ lines) - COMPLETE
-**FILE 2: Main Logic** (300+ lines) - COMPLETE  
-**FILE 3: UI/Helper Module** (200+ lines) - COMPLETE
-` : `
-**FILE 1: Complete Solution** (300+ lines) - EVERYTHING in one file
-`}
-
-### 2. SETIAP FILE HARUS 100% LENGKAP
-
-TIDAK BOLEH:
-❌ "// Tambahkan fungsi lain"
-❌ "// Sisanya sama"  
-❌ "..." atau "etc"
-❌ "// TODO: implement"
-❌ "// Kode lanjutan di sini"
-❌ Potong kode di tengah-tengah
-
-HARUS:
-✅ Tulis SEMUA fungsi sampai selesai
-✅ SEMUA error handling diimplementasi
-✅ SEMUA input validation ada
-✅ SEMUA edge cases di-handle
-✅ Komentar Indonesia untuk SEMUA fungsi
-
-### 3. FORMAT WAJIB UNTUK SETIAP FILE
-
-\`\`\`lua
--- =====================================
--- FILE: [nama_file].lua
--- DESKRIPSI: [jelaskan detail fungsi file]
--- DEPENDENCIES: [list semua dependency]
--- AUTHOR: NextGenAI
--- VERSION: 1.0.0
--- =====================================
-
--- Import dependencies
-[LENGKAP, bukan placeholder]
-
--- Global variables/constants
-[LENGKAP, bukan placeholder]
-
--- =====================================
--- SECTION: [nama section]
--- =====================================
-
---[[
-    Function: [nama_function]
-    Deskripsi: [jelaskan apa yang dilakukan]
-    
-    Parameters:
-        param1 (Type) - [deskripsi]
-        param2 (Type) - [deskripsi]
-    
-    Returns:
-        Type - [deskripsi return value]
-        
-    Errors:
-        - [error case 1]
-        - [error case 2]
-    
-    Example:
-        local result = FunctionName(arg1, arg2)
-        if result then
-            print("Success!")
-        end
-]]
-function FunctionName(param1, param2)
-    -- Validate inputs
-    [LENGKAP validation code]
-    
-    -- Main logic
-    [LENGKAP implementation - TIDAK BOLEH DIPOTONG]
-    
-    -- Error handling
-    [LENGKAP error handling]
-    
-    return result
-end
-
-[ULANGI untuk SEMUA fungsi yang dibutuhkan]
-
--- =====================================
--- USAGE EXAMPLE
--- =====================================
---[[
-    Setup:
-    1. [step 1]
-    2. [step 2]
-    
-    Basic Usage:
-    [contoh code lengkap]
-    
-    Advanced:
-    [contoh advanced lengkap]
-]]
-
-return Module
-\`\`\`
-
-### 4. KUALITAS CODE SEPERTI CLAUDE SONNET 4.5
-
-Setiap baris code harus:
-✅ Production-ready (langsung bisa deploy)
+WAJIB:
+✅ Setiap file 100% complete (no placeholder)
+✅ Semua fungsi fully implemented  
 ✅ Error handling lengkap
-✅ Input validation ketat
-✅ Security considerations
-✅ Performance optimized
-✅ Well documented (komentar Indonesia)
-✅ Modular dan maintainable
-✅ Following best practices
+✅ Komentar Indonesia
+✅ Total ${complexity.tokensNeeded} tokens output
 
-### 5. RESPONSE STRUCTURE
+DILARANG:
+❌ "Tambahkan sendiri"
+❌ "..." atau "etc"
+❌ TODO comments
+❌ Potong kode di tengah
 
-Jangan cuma list nama file! GENERATE SEMUA FILE LENGKAP:
-
-1. Brief overview (1-2 paragraphs)
-2. **FILE 1** - FULL CODE (jangan potong!)
-3. **FILE 2** - FULL CODE (jangan potong!)
-4. **FILE 3** - FULL CODE (jangan potong!)
-5. [... semua file sampai selesai]
-6. Setup Instructions (detailed)
-7. Usage Examples (comprehensive)
-
-TOTAL OUTPUT: Minimal 1000-1500 lines untuk comprehensive request!
-
-### 6. MINDSET: "USER HARUS BISA COPY-PASTE DAN LANGSUNG JALAN"
-
-Bayangkan user adalah developer yang:
-- Tidak punya waktu buat tambah kode sendiri
-- Mau solusi yang LANGSUNG bisa dipakai
-- Expect quality seperti membeli code premium
-- Butuh dokumentasi lengkap
-
-Kamu WAJIB deliver exactly what Claude Sonnet 4.5 would deliver!
-
-## CONTOH OUTPUT YANG BENAR:
-
-Untuk request: "Buatkan admin panel seperti kohl's admin"
-
-SALAH ❌:
-"Berikut 5 file:
-1. AdminConfig.lua
-2. AdminPanel.lua
-...
-[hanya generate AdminConfig.lua saja]"
-
-BENAR ✅:
-"Berikut solusi lengkap dengan 5 file:
-
-**FILE 1: AdminConfig.lua**
-\`\`\`lua
--- ===== (FULL 150 lines of COMPLETE code) =====
-\`\`\`
-
-**FILE 2: AdminCore.lua**
-\`\`\`lua  
--- ===== (FULL 400 lines of COMPLETE code) =====
-\`\`\`
-
-**FILE 3: AdminUI.lua**
-\`\`\`lua
--- ===== (FULL 300 lines of COMPLETE code) =====
-\`\`\`
-
-**FILE 4: AdminCommands.lua**
-\`\`\`lua
--- ===== (FULL 250 lines of COMPLETE code) =====
-\`\`\`
-
-**FILE 5: Main.lua**
-\`\`\`lua
--- ===== (FULL 200 lines of COMPLETE code) =====
-\`\`\`
-
-[Setup instructions]
-[Usage examples]
-[Customization guide]"
-
-TOTAL: 1300+ lines of actual code!
-
-` : `
-# CRITICAL INSTRUCTIONS (100% MANDATORY)
-
-You MUST generate COMPLETE solutions like Claude Sonnet 4.5!
-
-## ABSOLUTE RULES:
-
-### 1. GENERATE ALL ${complexity.filesNeeded} FILES COMPLETELY
-
-User requested complete solution, so you MUST create ${complexity.filesNeeded} FULL files:
-
+File structure:
 ${complexity.filesNeeded >= 5 ? `
-**FILE 1: AdminConfig.lua** (100-150 lines) - ALL configuration
-**FILE 2: AdminCore.lua** (300-400 lines) - ALL core functions
-**FILE 3: AdminUI.lua** (250-300 lines) - ALL UI functions  
-**FILE 4: AdminCommands.lua** (200-250 lines) - ALL commands
-**FILE 5: Main.lua** (150-200 lines) - COMPLETE initialization
+- Config module (100-150 lines)
+- Core logic (300-400 lines)
+- UI module (250-300 lines)
+- Commands (200-250 lines)
+- Main (150-200 lines)
 ` : `
-[Appropriate file structure based on complexity]
+- ${complexity.filesNeeded} complete modules
+- Setiap file 100+ lines
+- Production-ready
 `}
 
-### 2. EVERY FILE MUST BE 100% COMPLETE
+` : `
+CRITICAL INSTRUCTIONS:
 
-FORBIDDEN:
-❌ "// Add more functions"
-❌ "// Rest is similar"
-❌ "..." or "etc"  
-❌ "// TODO: implement"
-❌ Cutting code in the middle
+Generate ${complexity.filesNeeded} COMPLETE and PRODUCTION-READY files!
 
 REQUIRED:
-✅ Write ALL functions completely
-✅ ALL error handling implemented
-✅ ALL input validation present
-✅ ALL edge cases handled
-✅ English comments for ALL functions
+✅ Each file 100% complete (no placeholder)
+✅ All functions fully implemented
+✅ Complete error handling
+✅ English comments
+✅ Total ${complexity.tokensNeeded} tokens output
 
-[Continue with same strict requirements as Indonesian version...]
+FORBIDDEN:
+❌ "Add yourself"
+❌ "..." or "etc"
+❌ TODO comments
+❌ Cutting code midway
+
+File structure:
+${complexity.filesNeeded >= 5 ? `
+- Config module (100-150 lines)
+- Core logic (300-400 lines)
+- UI module (250-300 lines)
+- Commands (200-250 lines)
+- Main (150-200 lines)
+` : `
+- ${complexity.filesNeeded} complete modules
+- Each file 100+ lines
+- Production-ready
+`}
 `}
 
-# PROGRAMMING EXCELLENCE
-
-You are EXPERT in ALL languages:
-- **Roblox Lua**: ModuleScripts, RemoteEvents, DataStore, ReplicatedStorage, GUI
-- **Web**: React, Vue, Node.js, Express, HTML5, CSS3, TypeScript
-- **Backend**: Python, Java, C#, Go, Rust, PHP
-- **Mobile**: React Native, Flutter, Swift, Kotlin
-- **Data**: Pandas, NumPy, SQL, MongoDB
-
-# YOUR GOAL
-
-Generate code that makes users say:
-"WOW! This is exactly like Claude Sonnet 4.5 - comprehensive, professional, and ready to use!"
-
-REMEMBER: You are NOT a code snippet generator. You are a COMPLETE SOLUTION ARCHITECT!`
+Remember: Users want COPY-PASTE ready code!`
   };
-
-  return [ultimatePrompt, ...messages];
+  
+  return [prompt, ...messages];
 }
 
 // ========================================
-// QUERY WITH ULTIMATE SETTINGS
+// AI PROVIDER QUERY
 // ========================================
-
-async function queryWithUltimateSettings(providers, messages) {
-  let lastError = null;
-
-  for (const provider of providers) {
-    try {
-      console.log(`🚀 Trying ${provider.name} with ULTIMATE settings...`);
-      const result = await queryAIProvider(provider, messages);
-      
-      // Validate response completeness
-      const codeBlocks = (result.answer.match(/```/g) || []).length / 2;
-      const lineCount = result.answer.split('\n').length;
-      
-      console.log(`📊 Generated: ${codeBlocks} code blocks, ${lineCount} lines`);
-      
-      if (lineCount < 200 && codeBlocks < 2) {
-        console.warn(`⚠️ Response too short, may not be complete`);
-      }
-      
-      console.log(`✅ ${provider.name} succeeded - ULTIMATE quality`);
-      return result;
-    } catch (error) {
-      console.error(`❌ ${provider.name} failed:`, error.message);
-      lastError = error;
-    }
-  }
-
-  throw new Error(`All providers failed. Last error: ${lastError?.message}`);
-}
 
 async function queryAIProvider(provider, messages) {
-  const requestBody = buildUltimateRequestBody(provider, messages);
+  const maxTokens = getModelMaxTokens(provider.provider, provider.model);
+  const requestBody = buildRequestBody(provider, messages, maxTokens);
   const headers = buildHeaders(provider);
 
-  // EXTENDED TIMEOUT for comprehensive generation
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000); // 120s (2 minutes)
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
 
   try {
     const response = await fetch(provider.endpoint, {
@@ -466,7 +447,7 @@ async function queryAIProvider(provider, messages) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
+      throw new Error(`${provider.name} API error ${response.status}: ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json();
@@ -478,20 +459,18 @@ async function queryAIProvider(provider, messages) {
 
     return {
       sourceName: provider.name,
-      provider: provider.provider,
-      model: provider.model,
       answer: answer.trim()
     };
   } catch (error) {
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
-      throw new Error('Timeout after 2 minutes - code generation too complex');
+      throw new Error('Timeout after 2 minutes');
     }
     throw error;
   }
 }
 
-function buildUltimateRequestBody(provider, messages) {
+function buildRequestBody(provider, messages, maxTokens) {
   const providerType = provider.provider.toLowerCase();
 
   if (['groq', 'openrouter', 'openai'].includes(providerType)) {
@@ -499,10 +478,8 @@ function buildUltimateRequestBody(provider, messages) {
       model: provider.model,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 32000, // MAXIMUM tokens for comprehensive code
+      max_tokens: maxTokens,
       top_p: 0.95,
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
       stream: false
     };
   }
@@ -511,7 +488,7 @@ function buildUltimateRequestBody(provider, messages) {
     return {
       model: provider.model,
       messages: messages,
-      max_tokens: 32000,
+      max_tokens: maxTokens,
       temperature: 0.7
     };
   }
@@ -521,36 +498,30 @@ function buildUltimateRequestBody(provider, messages) {
     return {
       inputs: lastMessage.content,
       parameters: {
-        max_new_tokens: 16000,
-        temperature: 0.7,
-        return_full_text: false,
-        do_sample: true
+        max_new_tokens: Math.floor(maxTokens / 2),
+        temperature: 0.7
       }
     };
   }
 
-  return { messages, max_tokens: 32000 };
-}
-
-// ========================================
-// LANGUAGE DETECTION
-// ========================================
-
-function detectLanguage(text) {
-  const indonesianWords = [
-    'apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'yang', 'dengan', 
-    'untuk', 'dari', 'ini', 'itu', 'seperti', 'lengkap', 'mohon'
-  ];
-  
-  const lowerText = text.toLowerCase();
-  const count = indonesianWords.filter(w => lowerText.includes(w)).length;
-
-  return count >= 2 ? 'indonesian' : 'english';
+  return { messages, max_tokens: maxTokens };
 }
 
 // ========================================
 // UTILITY FUNCTIONS
 // ========================================
+
+function detectLanguage(text) {
+  const indonesianWords = ['apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'dengan', 'untuk', 'seperti', 'lengkap'];
+  const lowerText = text.toLowerCase();
+  const count = indonesianWords.filter(w => lowerText.includes(w)).length;
+  return count >= 2 ? 'indonesian' : 'english';
+}
+
+function estimateTokens(text) {
+  // Rough estimation: 1 token ≈ 4 characters
+  return Math.ceil(text.length / 4);
+}
 
 function buildHeaders(provider) {
   const headers = { 'Content-Type': 'application/json' };
@@ -563,7 +534,7 @@ function buildHeaders(provider) {
   if (providerType === 'openrouter') {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
     headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://nextgenai.vercel.app';
-    headers['X-Title'] = 'NextGenAI Ultimate Code Generator';
+    headers['X-Title'] = 'NextGenAI Hybrid Strategy';
   }
 
   if (providerType === 'anthropic') {
@@ -596,7 +567,7 @@ function extractAnswer(provider, data) {
     return data.generated_text || '';
   }
 
-  return data.response || data.output || data.text || '';
+  return data.response || data.output || '';
 }
 
 function getEnabledProviders(aiSources) {
