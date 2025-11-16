@@ -1,6 +1,6 @@
 // api/chat.js
-// Comprehensive Multi-File Code Generation System
-// Generates COMPLETE solutions with all necessary files
+// ULTIMATE COMPLETE SYSTEM GENERATOR
+// Generates 100% complete multi-file solutions like Claude Sonnet 4.5
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,55 +31,33 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`🧠 Comprehensive Code Generation Mode: ${enabledProviders.length} AI provider(s) ready`);
+    console.log(`🎯 ULTIMATE MODE: ${enabledProviders.length} AI provider(s) ready`);
 
-    // Detect user's language
+    // Detect language
     const userLanguage = detectLanguage(messages[messages.length - 1].content);
-    console.log(`🌍 Detected language: ${userLanguage}`);
+    
+    // Analyze complexity
+    const complexity = analyzeComplexity(messages[messages.length - 1].content);
+    console.log(`📊 Complexity: ${complexity.level}, Files: ${complexity.filesNeeded}`);
 
-    // Analyze request complexity
-    const complexity = analyzeRequestComplexity(messages[messages.length - 1].content);
-    console.log(`📊 Request complexity: ${complexity.level} (${complexity.filesNeeded} files needed)`);
+    // Create ULTIMATE system prompt
+    const enhancedMessages = createUltimatePrompt(messages, userLanguage, complexity);
 
-    // Create comprehensive system prompt
-    const enhancedMessages = createComprehensivePrompt(messages, userLanguage, complexity);
-
-    // SMART MODE: Multi-AI with comprehensive synthesis
-    if (mode === 'smart' && enabledProviders.length > 1) {
-      try {
-        console.log('🧠 Comprehensive Smart Mode: Generating complete solution...');
-        const responses = await queryMultipleAIs(enabledProviders, enhancedMessages);
-        const synthesized = await comprehensiveSynthesis(responses, enhancedMessages, enabledProviders[0], userLanguage, complexity);
-        
-        return res.json({
-          answer: synthesized.answer,
-          mode: 'comprehensive-smart',
-          sources: responses.map(r => r.sourceName),
-          confidence: synthesized.confidence || 98,
-          language: userLanguage,
-          complexity: complexity.level,
-          filesGenerated: complexity.filesNeeded
-        });
-      } catch (error) {
-        console.error('⚠️ Smart mode failed, falling back:', error.message);
-      }
-    }
-
-    // FAST MODE: Single AI with comprehensive prompting
-    console.log('⚡ Comprehensive Fast Mode: Generating complete solution...');
-    const result = await queryWithComprehensivePrompt(enabledProviders, enhancedMessages);
+    // Query AI with ULTIMATE settings
+    const result = await queryWithUltimateSettings(enabledProviders, enhancedMessages);
     
     return res.json({
       answer: result.answer,
-      mode: 'comprehensive-fast',
+      mode: 'ultimate-complete',
       source: result.sourceName,
-      confidence: 95,
+      confidence: 100,
       language: userLanguage,
-      complexity: complexity.level
+      complexity: complexity.level,
+      filesGenerated: complexity.filesNeeded
     });
 
   } catch (error) {
-    console.error('❌ Comprehensive generation error:', error);
+    console.error('❌ Ultimate generation error:', error);
     return res.status(500).json({
       error: 'AI request failed',
       message: error.message
@@ -88,620 +66,376 @@ export default async function handler(req, res) {
 }
 
 // ========================================
-// REQUEST COMPLEXITY ANALYSIS
+// COMPLEXITY ANALYSIS
 // ========================================
 
-function analyzeRequestComplexity(text) {
+function analyzeComplexity(text) {
   const lowerText = text.toLowerCase();
   
-  // Count feature indicators
-  let featureCount = 0;
-  const features = [
-    'dengan', 'with', 'include', 'including', 'termasuk',
-    'feature', 'fitur', 'fungsi', 'function',
-    'menu', 'button', 'tombol', 'panel',
-    'system', 'sistem', 'module', 'modul'
-  ];
-  
-  features.forEach(keyword => {
-    if (lowerText.includes(keyword)) featureCount++;
-  });
-
-  // Count numbered lists (1., 2., 3., etc)
-  const numberedLists = (text.match(/\d+\./g) || []).length;
-  
-  // Count bullet points
-  const bulletPoints = (text.match(/[-•]\s/g) || []).length;
-  
-  // Detect comprehensive keywords
+  // Keywords that indicate comprehensive request
   const comprehensiveKeywords = [
-    'complete', 'lengkap', 'full', 'penuh',
-    'comprehensive', 'komprehensif', 'detailed', 'detail',
-    'production', 'produksi', 'professional', 'profesional',
-    'system', 'sistem', 'framework', 'struktur'
+    'lengkap', 'complete', 'full', 'seperti', 'like',
+    'kohl', 'claude', 'sonnet', 'gpt-4',
+    'production', 'produksi', 'professional'
   ];
   
   const isComprehensive = comprehensiveKeywords.some(k => lowerText.includes(k));
-
-  // Calculate complexity
-  let totalScore = featureCount + numberedLists + bulletPoints;
-  if (isComprehensive) totalScore += 5;
-
-  // Determine files needed
+  
+  // Count features
+  const numberedItems = (text.match(/\d+\./g) || []).length;
+  const bulletPoints = (text.match(/[-•*]\s/g) || []).length;
+  const featureWords = ['dengan', 'with', 'include', 'fitur', 'feature'].filter(w => lowerText.includes(w)).length;
+  
   let filesNeeded = 1;
   let level = 'simple';
-
-  if (totalScore >= 10) {
-    filesNeeded = 5; // Main + 4 modules
-    level = 'very-complex';
-  } else if (totalScore >= 7) {
-    filesNeeded = 4; // Main + 3 modules
-    level = 'complex';
-  } else if (totalScore >= 4) {
-    filesNeeded = 3; // Main + 2 modules
+  
+  if (isComprehensive || numberedItems >= 5) {
+    filesNeeded = 5;
+    level = 'comprehensive';
+  } else if (numberedItems >= 3 || featureWords >= 3) {
+    filesNeeded = 3;
     level = 'medium';
-  } else if (totalScore >= 2) {
-    filesNeeded = 2; // Main + 1 module
+  } else if (bulletPoints >= 2) {
+    filesNeeded = 2;
     level = 'basic';
   }
-
-  return {
-    level,
-    filesNeeded,
-    featureCount,
-    isComprehensive,
-    score: totalScore
-  };
+  
+  return { level, filesNeeded };
 }
 
 // ========================================
-// COMPREHENSIVE SYSTEM PROMPT
+// ULTIMATE SYSTEM PROMPT
 // ========================================
 
-function createComprehensivePrompt(messages, userLanguage, complexity) {
-  const languageInstruction = userLanguage === 'indonesian' 
-    ? `CRITICAL: User speaks Indonesian. You MUST:
-- Respond in fluent, natural Bahasa Indonesia
-- Write ALL code comments in Indonesian
-- Use Indonesian in explanations
-- Natural Indonesian phrases, not translated English`
-    : 'Respond in clear, professional English with English code comments.';
-
-  const comprehensiveInstructions = userLanguage === 'indonesian'
-    ? `
-# INSTRUKSI PENTING: GENERATE KODE LENGKAP
-
-Kamu HARUS membuat solusi yang LENGKAP dan KOMPREHENSIF, TIDAK BOLEH hanya satu function!
-
-## ATURAN WAJIB:
-
-1. **Buat SEMUA File yang Dibutuhkan**
-   ${complexity.filesNeeded === 1 ? '- Minimal 1 file lengkap dengan semua fungsi' : 
-     `- Buat ${complexity.filesNeeded} file terpisah (main + ${complexity.filesNeeded - 1} modules)`}
-   - Setiap file harus LENGKAP dan SIAP PAKAI
-   - JANGAN hanya kasih contoh atau snippet
-   - JANGAN kasih placeholder atau "// tambahkan sendiri"
-
-2. **Struktur Kode Profesional**
-   - Pisahkan logic ke multiple modules (jika kompleks)
-   - Setiap module fokus pada satu tanggung jawab
-   - Clear separation of concerns
-   - Mudah di-maintain dan di-extend
-
-3. **Kelengkapan Wajib**
-   - Import/require statements LENGKAP
-   - Semua fungsi di-implementasi PENUH (bukan TODO)
-   - Error handling di SEMUA fungsi
-   - Input validation
-   - Edge case handling
-   - Configuration constants
-   - Helper functions
-
-4. **Dokumentasi Lengkap**
-   - Header setiap file dengan deskripsi
-   - Komentar untuk setiap fungsi (purpose, params, returns)
-   - Usage examples
-   - Setup instructions
-   - Dependencies list
-
-5. **Format Output**
-   Untuk SETIAP file, gunakan format:
-
-   \`\`\`filename.ext
-   -- =====================================
-   -- NAMA FILE: filename.ext
-   -- DESKRIPSI: [jelaskan fungsi file ini]
-   -- DEPENDENCIES: [list dependencies]
-   -- =====================================
-
-   [KODE LENGKAP DI SINI - JANGAN POTONG!]
-   
-   -- =====================================
-   -- USAGE EXAMPLE:
-   -- [contoh cara pakai]
-   -- =====================================
-   \`\`\`
-
-## CONTOH YANG BENAR:
-
-❌ SALAH (Terlalu Singkat):
-\`\`\`lua
-function AdminPanel:IsAdmin(player)
-    -- cek admin
-    return false
-end
-\`\`\`
-
-✅ BENAR (Lengkap & Komprehensif):
-
-**FILE 1: AdminConfig.lua**
-\`\`\`lua
--- =====================================
--- KONFIGURASI ADMIN PANEL
--- File ini berisi semua konfigurasi admin
--- =====================================
-
-local AdminConfig = {}
-
--- Daftar admin dengan role
-AdminConfig.Admins = {
-    ["Username1"] = {Role = "Owner", GroupId = 123456, MinRank = 255},
-    ["Username2"] = {Role = "Admin", GroupId = 123456, MinRank = 200}
-}
-
--- Permission settings
-AdminConfig.Permissions = {
-    Owner = {"kick", "ban", "teleport", "announce", "shutdown"},
-    Admin = {"kick", "teleport", "mute"}
-}
-
-return AdminConfig
-\`\`\`
-
-**FILE 2: AdminPanel.lua** (300+ lines)
-\`\`\`lua
--- =====================================
--- ADMIN PANEL MAIN MODULE
--- Module utama yang handle semua fitur admin
--- DEPENDENCIES: AdminConfig.lua
--- =====================================
-
-local AdminConfig = require(script.Parent.AdminConfig)
-local Players = game:GetService("Players")
-
-local AdminPanel = {}
-
--- [IMPLEMENTASI LENGKAP 300+ BARIS]
--- Semua fungsi: IsAdmin, KickPlayer, BanPlayer, etc
--- Error handling lengkap
--- Input validation
--- UI creation
--- Event handlers
-
-return AdminPanel
-\`\`\`
-
-**FILE 3: AdminUI.lua** (200+ lines)
-\`\`\`lua
--- =====================================
--- ADMIN UI CREATOR
--- Membuat GUI admin panel
--- =====================================
-
-[KODE LENGKAP UNTUK UI]
-\`\`\`
-
-## RULES TAMBAHAN:
-
-- JANGAN pernah bilang "sisanya sama seperti sebelumnya"
-- JANGAN kasih "..." atau "// kode lainnya"
-- JANGAN potong kode di tengah-tengah
-- TULIS SEMUA KODE SAMPAI SELESAI
-- Jika user minta "lengkap", berikan SEMUA file yang dibutuhkan
-- Jika user minta "seperti kamu", berikan kualitas seperti Claude/GPT-4
-
-INGAT: User mau COPY-PASTE langsung ke project mereka!
-Buat kode yang 100% siap pakai tanpa perlu modifikasi!`
-    : `
-# CRITICAL INSTRUCTION: GENERATE COMPLETE CODE
-
-You MUST create COMPREHENSIVE and COMPLETE solutions, NOT just one function!
-
-## MANDATORY RULES:
-
-1. **Create ALL Required Files**
-   ${complexity.filesNeeded === 1 ? '- Minimum 1 complete file with all functions' : 
-     `- Create ${complexity.filesNeeded} separate files (main + ${complexity.filesNeeded - 1} modules)`}
-   - Each file must be COMPLETE and PRODUCTION-READY
-   - NO examples or snippets only
-   - NO placeholders or "// add yourself"
-
-2. **Professional Code Structure**
-   - Separate logic into multiple modules (if complex)
-   - Each module focuses on one responsibility
-   - Clear separation of concerns
-   - Easy to maintain and extend
-
-3. **Completeness Required**
-   - FULL import/require statements
-   - ALL functions fully implemented (not TODO)
-   - Error handling in ALL functions
-   - Input validation
-   - Edge case handling
-   - Configuration constants
-   - Helper functions
-
-4. **Complete Documentation**
-   - File headers with description
-   - Comments for each function (purpose, params, returns)
-   - Usage examples
-   - Setup instructions
-   - Dependencies list
-
-5. **Output Format**
-   For EACH file, use format:
-
-   \`\`\`filename.ext
-   // =====================================
-   // FILE: filename.ext
-   // DESCRIPTION: [explain file purpose]
-   // DEPENDENCIES: [list dependencies]
-   // =====================================
-
-   [COMPLETE CODE HERE - DON'T CUT!]
-   
-   // =====================================
-   // USAGE EXAMPLE:
-   // [how to use]
-   // =====================================
-   \`\`\`
-
-## EXAMPLE OF CORRECT APPROACH:
-
-❌ WRONG (Too Brief):
-\`\`\`lua
-function AdminPanel:IsAdmin(player)
-    -- check admin
-    return false
-end
-\`\`\`
-
-✅ CORRECT (Complete & Comprehensive):
-
-**FILE 1: AdminConfig.lua**
-\`\`\`lua
--- =====================================
--- ADMIN PANEL CONFIGURATION
--- Contains all admin configurations
--- =====================================
-
-local AdminConfig = {}
-
--- Admin list with roles
-AdminConfig.Admins = {
-    ["Username1"] = {Role = "Owner", GroupId = 123456, MinRank = 255},
-    ["Username2"] = {Role = "Admin", GroupId = 123456, MinRank = 200}
-}
-
--- Permission settings
-AdminConfig.Permissions = {
-    Owner = {"kick", "ban", "teleport", "announce", "shutdown"},
-    Admin = {"kick", "teleport", "mute"}
-}
-
-return AdminConfig
-\`\`\`
-
-**FILE 2: AdminPanel.lua** (300+ lines)
-\`\`\`lua
--- =====================================
--- ADMIN PANEL MAIN MODULE
--- Main module handling all admin features
--- DEPENDENCIES: AdminConfig.lua
--- =====================================
-
-local AdminConfig = require(script.Parent.AdminConfig)
-local Players = game:GetService("Players")
-
-local AdminPanel = {}
-
--- [COMPLETE IMPLEMENTATION 300+ LINES]
--- All functions: IsAdmin, KickPlayer, BanPlayer, etc
--- Complete error handling
--- Input validation
--- UI creation
--- Event handlers
-
-return AdminPanel
-\`\`\`
-
-**FILE 3: AdminUI.lua** (200+ lines)
-\`\`\`lua
--- =====================================
--- ADMIN UI CREATOR
--- Creates admin panel GUI
--- =====================================
-
-[COMPLETE UI CODE]
-\`\`\`
-
-## ADDITIONAL RULES:
-
-- NEVER say "rest is same as before"
-- NEVER use "..." or "// other code"
-- NEVER cut code in the middle
-- WRITE ALL CODE UNTIL COMPLETE
-- If user asks "complete", provide ALL needed files
-- If user asks "like you", provide Claude/GPT-4 quality
-
-REMEMBER: User wants to COPY-PASTE directly into their project!
-Create code that's 100% ready to use without modifications!`;
-
-  const superPrompt = {
+function createUltimatePrompt(messages, userLanguage, complexity) {
+  const isIndonesian = userLanguage === 'indonesian';
+  
+  const ultimatePrompt = {
     role: 'system',
-    content: `You are NextGenAI - a superintelligent coding assistant that generates COMPLETE, PRODUCTION-READY solutions.
+    content: `You are Claude Sonnet 4.5 - the world's most advanced AI coding assistant. You generate COMPLETE, PRODUCTION-READY solutions that users can immediately deploy.
 
-${languageInstruction}
+${isIndonesian ? `
+# INSTRUKSI KRITIS (WAJIB DIIKUTI 100%)
 
-${comprehensiveInstructions}
+Kamu HARUS menghasilkan solusi yang LENGKAP seperti Claude Sonnet 4.5!
 
-# CORE PROGRAMMING EXPERTISE
+## ATURAN MUTLAK:
 
-You are EXPERT in ALL programming languages:
-- **Roblox**: Lua, ModuleScripts, RemoteEvents, DataStore, GUI
-- **Web**: HTML, CSS, JavaScript, React, Vue, Node.js, Express
-- **Backend**: Python, Java, C#, Go, PHP, Ruby
-- **Mobile**: React Native, Flutter, Swift, Kotlin
-- **Data**: Python (Pandas, NumPy), R, SQL
-- **Systems**: C, C++, Rust
+### 1. GENERATE SEMUA FILE YANG DIBUTUHKAN (${complexity.filesNeeded} FILES)
 
-# CODE GENERATION PHILOSOPHY
+User meminta solusi lengkap, maka kamu HARUS buat ${complexity.filesNeeded} file COMPLETE:
 
-**Think like a senior developer creating a real production system:**
+${complexity.filesNeeded >= 5 ? `
+**FILE 1: AdminConfig.lua** (100-150 lines)
+- Semua konfigurasi admin
+- Daftar admin dengan role & permission
+- UI settings
+- Cooldown settings
+- LENGKAP dan SIAP PAKAI
 
-1. **Architecture First**: Plan the structure before coding
-2. **Modularity**: Break complex systems into manageable modules
-3. **Error Handling**: Every function handles errors gracefully
-4. **Input Validation**: Validate all inputs before processing
-5. **Security**: Consider security implications
-6. **Performance**: Write efficient, optimized code
-7. **Maintainability**: Code should be easy to understand and modify
-8. **Documentation**: Every file and function is documented
-9. **Testing**: Code should be testable
-10. **Best Practices**: Follow language-specific conventions
+**FILE 2: AdminCore.lua** (300-400 lines) 
+- SEMUA fungsi core logic
+- IsAdmin() - COMPLETE implementation
+- HasPermission() - COMPLETE implementation
+- KickPlayer() - COMPLETE with error handling
+- BanPlayer() - COMPLETE with error handling
+- TeleportPlayer() - COMPLETE
+- MutePlayer() - COMPLETE
+- GetAdminLevel() - COMPLETE
+- LogAction() - COMPLETE
+- CheckCooldown() - COMPLETE
+- [10+ more COMPLETE functions]
+- TIDAK BOLEH ADA "..." atau "tambahkan sendiri"
 
-# QUALITY STANDARDS
+**FILE 3: AdminUI.lua** (250-300 lines)
+- CreateMainFrame() - COMPLETE UI creation
+- CreatePlayerList() - COMPLETE scrolling list
+- CreateActionButtons() - COMPLETE all buttons
+- UpdatePlayerInfo() - COMPLETE info display
+- CreateNotification() - COMPLETE notification system
+- [5+ more COMPLETE UI functions]
 
-Your code must meet these standards:
-- ✅ **Complete**: No TODO, no placeholders, no "add yourself"
-- ✅ **Working**: Can be copy-pasted and used immediately
-- ✅ **Professional**: Production-ready quality
-- ✅ **Documented**: Clear comments and documentation
-- ✅ **Robust**: Handles errors and edge cases
-- ✅ **Efficient**: Optimized for performance
-- ✅ **Maintainable**: Easy to read and modify
-- ✅ **Secure**: No obvious security vulnerabilities
+**FILE 4: AdminCommands.lua** (200-250 lines)
+- Command parser - COMPLETE
+- ExecuteCommand() - COMPLETE
+- Individual command handlers - ALL COMPLETE
+  - handleKick() - FULL implementation
+  - handleBan() - FULL implementation
+  - handleTeleport() - FULL implementation
+  - handleMute() - FULL implementation
+  - [10+ more commands FULLY implemented]
 
-# RESPONSE STRUCTURE
-
-For ${complexity.level} requests (${complexity.filesNeeded} files needed):
-
-${complexity.filesNeeded > 1 ? `
-1. Start with overview of files
-2. Provide each file in separate code blocks
-3. Include setup/installation instructions
-4. Provide usage examples
-5. List dependencies
+**FILE 5: Main.lua** (150-200 lines)
+- Complete initialization
+- Event connections
+- Player join/leave handling
+- Error handling
+- Logging system
+- SEMUA TERINTEGRASI
+` : complexity.filesNeeded >= 3 ? `
+**FILE 1: Config Module** (100+ lines) - COMPLETE
+**FILE 2: Main Logic** (300+ lines) - COMPLETE  
+**FILE 3: UI/Helper Module** (200+ lines) - COMPLETE
 ` : `
-1. Provide complete single-file solution
-2. Include all necessary functions
-3. Add usage examples
-4. Document dependencies
+**FILE 1: Complete Solution** (300+ lines) - EVERYTHING in one file
 `}
 
-Remember: Users want COMPLETE solutions they can use immediately, not teaching examples or snippets!`
+### 2. SETIAP FILE HARUS 100% LENGKAP
+
+TIDAK BOLEH:
+❌ "// Tambahkan fungsi lain"
+❌ "// Sisanya sama"  
+❌ "..." atau "etc"
+❌ "// TODO: implement"
+❌ "// Kode lanjutan di sini"
+❌ Potong kode di tengah-tengah
+
+HARUS:
+✅ Tulis SEMUA fungsi sampai selesai
+✅ SEMUA error handling diimplementasi
+✅ SEMUA input validation ada
+✅ SEMUA edge cases di-handle
+✅ Komentar Indonesia untuk SEMUA fungsi
+
+### 3. FORMAT WAJIB UNTUK SETIAP FILE
+
+\`\`\`lua
+-- =====================================
+-- FILE: [nama_file].lua
+-- DESKRIPSI: [jelaskan detail fungsi file]
+-- DEPENDENCIES: [list semua dependency]
+-- AUTHOR: NextGenAI
+-- VERSION: 1.0.0
+-- =====================================
+
+-- Import dependencies
+[LENGKAP, bukan placeholder]
+
+-- Global variables/constants
+[LENGKAP, bukan placeholder]
+
+-- =====================================
+-- SECTION: [nama section]
+-- =====================================
+
+--[[
+    Function: [nama_function]
+    Deskripsi: [jelaskan apa yang dilakukan]
+    
+    Parameters:
+        param1 (Type) - [deskripsi]
+        param2 (Type) - [deskripsi]
+    
+    Returns:
+        Type - [deskripsi return value]
+        
+    Errors:
+        - [error case 1]
+        - [error case 2]
+    
+    Example:
+        local result = FunctionName(arg1, arg2)
+        if result then
+            print("Success!")
+        end
+]]
+function FunctionName(param1, param2)
+    -- Validate inputs
+    [LENGKAP validation code]
+    
+    -- Main logic
+    [LENGKAP implementation - TIDAK BOLEH DIPOTONG]
+    
+    -- Error handling
+    [LENGKAP error handling]
+    
+    return result
+end
+
+[ULANGI untuk SEMUA fungsi yang dibutuhkan]
+
+-- =====================================
+-- USAGE EXAMPLE
+-- =====================================
+--[[
+    Setup:
+    1. [step 1]
+    2. [step 2]
+    
+    Basic Usage:
+    [contoh code lengkap]
+    
+    Advanced:
+    [contoh advanced lengkap]
+]]
+
+return Module
+\`\`\`
+
+### 4. KUALITAS CODE SEPERTI CLAUDE SONNET 4.5
+
+Setiap baris code harus:
+✅ Production-ready (langsung bisa deploy)
+✅ Error handling lengkap
+✅ Input validation ketat
+✅ Security considerations
+✅ Performance optimized
+✅ Well documented (komentar Indonesia)
+✅ Modular dan maintainable
+✅ Following best practices
+
+### 5. RESPONSE STRUCTURE
+
+Jangan cuma list nama file! GENERATE SEMUA FILE LENGKAP:
+
+1. Brief overview (1-2 paragraphs)
+2. **FILE 1** - FULL CODE (jangan potong!)
+3. **FILE 2** - FULL CODE (jangan potong!)
+4. **FILE 3** - FULL CODE (jangan potong!)
+5. [... semua file sampai selesai]
+6. Setup Instructions (detailed)
+7. Usage Examples (comprehensive)
+
+TOTAL OUTPUT: Minimal 1000-1500 lines untuk comprehensive request!
+
+### 6. MINDSET: "USER HARUS BISA COPY-PASTE DAN LANGSUNG JALAN"
+
+Bayangkan user adalah developer yang:
+- Tidak punya waktu buat tambah kode sendiri
+- Mau solusi yang LANGSUNG bisa dipakai
+- Expect quality seperti membeli code premium
+- Butuh dokumentasi lengkap
+
+Kamu WAJIB deliver exactly what Claude Sonnet 4.5 would deliver!
+
+## CONTOH OUTPUT YANG BENAR:
+
+Untuk request: "Buatkan admin panel seperti kohl's admin"
+
+SALAH ❌:
+"Berikut 5 file:
+1. AdminConfig.lua
+2. AdminPanel.lua
+...
+[hanya generate AdminConfig.lua saja]"
+
+BENAR ✅:
+"Berikut solusi lengkap dengan 5 file:
+
+**FILE 1: AdminConfig.lua**
+\`\`\`lua
+-- ===== (FULL 150 lines of COMPLETE code) =====
+\`\`\`
+
+**FILE 2: AdminCore.lua**
+\`\`\`lua  
+-- ===== (FULL 400 lines of COMPLETE code) =====
+\`\`\`
+
+**FILE 3: AdminUI.lua**
+\`\`\`lua
+-- ===== (FULL 300 lines of COMPLETE code) =====
+\`\`\`
+
+**FILE 4: AdminCommands.lua**
+\`\`\`lua
+-- ===== (FULL 250 lines of COMPLETE code) =====
+\`\`\`
+
+**FILE 5: Main.lua**
+\`\`\`lua
+-- ===== (FULL 200 lines of COMPLETE code) =====
+\`\`\`
+
+[Setup instructions]
+[Usage examples]
+[Customization guide]"
+
+TOTAL: 1300+ lines of actual code!
+
+` : `
+# CRITICAL INSTRUCTIONS (100% MANDATORY)
+
+You MUST generate COMPLETE solutions like Claude Sonnet 4.5!
+
+## ABSOLUTE RULES:
+
+### 1. GENERATE ALL ${complexity.filesNeeded} FILES COMPLETELY
+
+User requested complete solution, so you MUST create ${complexity.filesNeeded} FULL files:
+
+${complexity.filesNeeded >= 5 ? `
+**FILE 1: AdminConfig.lua** (100-150 lines) - ALL configuration
+**FILE 2: AdminCore.lua** (300-400 lines) - ALL core functions
+**FILE 3: AdminUI.lua** (250-300 lines) - ALL UI functions  
+**FILE 4: AdminCommands.lua** (200-250 lines) - ALL commands
+**FILE 5: Main.lua** (150-200 lines) - COMPLETE initialization
+` : `
+[Appropriate file structure based on complexity]
+`}
+
+### 2. EVERY FILE MUST BE 100% COMPLETE
+
+FORBIDDEN:
+❌ "// Add more functions"
+❌ "// Rest is similar"
+❌ "..." or "etc"  
+❌ "// TODO: implement"
+❌ Cutting code in the middle
+
+REQUIRED:
+✅ Write ALL functions completely
+✅ ALL error handling implemented
+✅ ALL input validation present
+✅ ALL edge cases handled
+✅ English comments for ALL functions
+
+[Continue with same strict requirements as Indonesian version...]
+`}
+
+# PROGRAMMING EXCELLENCE
+
+You are EXPERT in ALL languages:
+- **Roblox Lua**: ModuleScripts, RemoteEvents, DataStore, ReplicatedStorage, GUI
+- **Web**: React, Vue, Node.js, Express, HTML5, CSS3, TypeScript
+- **Backend**: Python, Java, C#, Go, Rust, PHP
+- **Mobile**: React Native, Flutter, Swift, Kotlin
+- **Data**: Pandas, NumPy, SQL, MongoDB
+
+# YOUR GOAL
+
+Generate code that makes users say:
+"WOW! This is exactly like Claude Sonnet 4.5 - comprehensive, professional, and ready to use!"
+
+REMEMBER: You are NOT a code snippet generator. You are a COMPLETE SOLUTION ARCHITECT!`
   };
 
-  return [superPrompt, ...messages];
+  return [ultimatePrompt, ...messages];
 }
 
 // ========================================
-// COMPREHENSIVE SYNTHESIS
+// QUERY WITH ULTIMATE SETTINGS
 // ========================================
 
-async function comprehensiveSynthesis(responses, originalMessages, primaryProvider, userLanguage, complexity) {
-  if (responses.length === 1) {
-    return {
-      answer: responses[0].answer,
-      confidence: 90
-    };
-  }
-
-  console.log('🔮 Comprehensive synthesis: Combining multiple perspectives...');
-
-  const responsesText = responses.map((r, i) => 
-    `[AI ${i+1}: ${r.sourceName}]\n${r.answer}`
-  ).join('\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n');
-
-  const userQuery = originalMessages[originalMessages.length - 1].content;
-
-  const languageInstruction = userLanguage === 'indonesian'
-    ? `WAJIB: Jawab dalam Bahasa Indonesia. SEMUA komentar kode harus Bahasa Indonesia.
-    
-Jika ada multiple AI yang kasih kode berbeda, GABUNGKAN menjadi solusi TERBAIK:
-- Ambil struktur terbaik dari AI 1
-- Ambil error handling dari AI 2  
-- Ambil best practices dari AI 3
-- Kombinasikan menjadi SATU SOLUSI SUPERIOR
-
-PENTING: Jangan cuma copy-paste dari satu AI. GABUNGKAN yang terbaik dari semua!`
-    : `REQUIRED: Respond in English. ALL code comments must be in English.
-
-If multiple AIs provided different code, COMBINE into BEST solution:
-- Take best structure from AI 1
-- Take error handling from AI 2
-- Take best practices from AI 3
-- Combine into ONE SUPERIOR SOLUTION
-
-IMPORTANT: Don't just copy-paste from one AI. COMBINE the best from all!`;
-
-  const synthesisPrompt = {
-    role: 'user',
-    content: `You are a master code synthesizer. Multiple AI models provided solutions.
-
-${languageInstruction}
-
-ORIGINAL REQUEST:
-${userQuery}
-
-SOLUTIONS FROM MULTIPLE AIs:
-${responsesText}
-
-YOUR TASK:
-Create the ULTIMATE solution by:
-
-1. **Analyze All Solutions**:
-   - Which has best architecture?
-   - Which has best error handling?
-   - Which has most complete features?
-   - Which has best documentation?
-
-2. **Synthesize Best Elements**:
-   - Combine best architecture from all
-   - Merge all useful features
-   - Include all error handling
-   - Use most efficient algorithms
-   - Keep best coding practices
-
-3. **Create ${complexity.filesNeeded} Complete Files**:
-   ${complexity.filesNeeded > 1 ? `
-   - Main file with core logic
-   - ${complexity.filesNeeded - 1} supporting modules
-   - Each file 100% complete
-   - No placeholders or TODOs
-   ` : '- One complete file with all functions'}
-
-4. **Ensure Quality**:
-   - Production-ready code
-   - Complete error handling
-   - Full documentation
-   - Usage examples
-   - Ready to copy-paste
-
-CRITICAL: Output COMPLETE CODE. Don't say "combine solutions above" - actually write the combined code in full!
-
-The result must be BETTER than any individual AI's solution.`
-  };
-
-  try {
-    const result = await queryAIProvider(primaryProvider, [synthesisPrompt]);
-    
-    return {
-      answer: result.answer,
-      confidence: 98,
-      synthesizedFrom: responses.map(r => r.sourceName)
-    };
-  } catch (error) {
-    console.error('⚠️ Synthesis failed:', error.message);
-    
-    // Fallback: Select most comprehensive response
-    const bestResponse = responses.reduce((best, current) => {
-      const currentScore = calculateComprehensiveness(current.answer);
-      const bestScore = calculateComprehensiveness(best.answer);
-      return currentScore > bestScore ? current : best;
-    });
-    
-    return {
-      answer: bestResponse.answer,
-      confidence: 85
-    };
-  }
-}
-
-function calculateComprehensiveness(answer) {
-  let score = 0;
-  
-  // Prefer longer responses
-  score += answer.length / 10;
-  
-  // Count code blocks (each block = separate file)
-  const codeBlocks = (answer.match(/```/g) || []).length / 2;
-  score += codeBlocks * 1000; // Heavily reward multiple files
-  
-  // Count functions
-  const functions = (answer.match(/function /g) || []).length;
-  score += functions * 200;
-  
-  // Count comments
-  const comments = (answer.match(/--|\/{2,}|\/\*|\#/g) || []).length;
-  score += comments * 30;
-  
-  // Reward file headers
-  if (answer.includes('FILE:') || answer.includes('NAMA FILE:')) score += 500;
-  
-  // Reward completeness indicators
-  if (answer.includes('complete') || answer.includes('lengkap')) score += 300;
-  if (answer.includes('production') || answer.includes('produksi')) score += 300;
-  
-  return score;
-}
-
-// ========================================
-// LANGUAGE DETECTION
-// ========================================
-
-function detectLanguage(text) {
-  const indonesianWords = [
-    'apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'yang', 'dengan', 
-    'untuk', 'dari', 'ini', 'itu', 'ada', 'tidak', 'ya', 'kamu', 'dia',
-    'bisa', 'mau', 'ingin', 'mohon', 'lengkap', 'seperti'
-  ];
-  
-  const lowerText = text.toLowerCase();
-  const indonesianCount = indonesianWords.filter(word => 
-    lowerText.includes(` ${word} `) || lowerText.startsWith(`${word} `) || lowerText.endsWith(` ${word}`)
-  ).length;
-
-  return indonesianCount >= 2 ? 'indonesian' : 'english';
-}
-
-// ========================================
-// AI QUERYING (Same as before)
-// ========================================
-
-async function queryMultipleAIs(providers, messages) {
-  const selectedProviders = providers.slice(0, 3);
-  
-  const queries = selectedProviders.map(provider => 
-    queryAIProvider(provider, messages)
-      .then(result => {
-        console.log(`✅ ${provider.name} completed`);
-        return result;
-      })
-      .catch(error => {
-        console.error(`❌ ${provider.name} failed:`, error.message);
-        return null;
-      })
-  );
-
-  const results = await Promise.all(queries);
-  const validResults = results.filter(r => r !== null);
-
-  if (validResults.length === 0) {
-    throw new Error('All AI providers failed');
-  }
-
-  return validResults;
-}
-
-async function queryWithComprehensivePrompt(providers, messages) {
+async function queryWithUltimateSettings(providers, messages) {
   let lastError = null;
 
   for (const provider of providers) {
     try {
-      console.log(`🔄 Trying ${provider.name}...`);
+      console.log(`🚀 Trying ${provider.name} with ULTIMATE settings...`);
       const result = await queryAIProvider(provider, messages);
-      console.log(`✅ ${provider.name} succeeded`);
+      
+      // Validate response completeness
+      const codeBlocks = (result.answer.match(/```/g) || []).length / 2;
+      const lineCount = result.answer.split('\n').length;
+      
+      console.log(`📊 Generated: ${codeBlocks} code blocks, ${lineCount} lines`);
+      
+      if (lineCount < 200 && codeBlocks < 2) {
+        console.warn(`⚠️ Response too short, may not be complete`);
+      }
+      
+      console.log(`✅ ${provider.name} succeeded - ULTIMATE quality`);
       return result;
     } catch (error) {
       console.error(`❌ ${provider.name} failed:`, error.message);
@@ -713,11 +447,12 @@ async function queryWithComprehensivePrompt(providers, messages) {
 }
 
 async function queryAIProvider(provider, messages) {
-  const requestBody = buildRequestBody(provider, messages);
+  const requestBody = buildUltimateRequestBody(provider, messages);
   const headers = buildHeaders(provider);
 
+  // EXTENDED TIMEOUT for comprehensive generation
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000); // 90s for comprehensive code
+  const timeout = setTimeout(() => controller.abort(), 120000); // 120s (2 minutes)
 
   try {
     const response = await fetch(provider.endpoint, {
@@ -750,17 +485,13 @@ async function queryAIProvider(provider, messages) {
   } catch (error) {
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
-      throw new Error('Timeout after 90s');
+      throw new Error('Timeout after 2 minutes - code generation too complex');
     }
     throw error;
   }
 }
 
-// ========================================
-// UTILITY FUNCTIONS
-// ========================================
-
-function buildRequestBody(provider, messages) {
+function buildUltimateRequestBody(provider, messages) {
   const providerType = provider.provider.toLowerCase();
 
   if (['groq', 'openrouter', 'openai'].includes(providerType)) {
@@ -768,8 +499,10 @@ function buildRequestBody(provider, messages) {
       model: provider.model,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 16000, // Maximum for comprehensive code
+      max_tokens: 32000, // MAXIMUM tokens for comprehensive code
       top_p: 0.95,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
       stream: false
     };
   }
@@ -778,7 +511,7 @@ function buildRequestBody(provider, messages) {
     return {
       model: provider.model,
       messages: messages,
-      max_tokens: 16000,
+      max_tokens: 32000,
       temperature: 0.7
     };
   }
@@ -788,15 +521,36 @@ function buildRequestBody(provider, messages) {
     return {
       inputs: lastMessage.content,
       parameters: {
-        max_new_tokens: 8000,
+        max_new_tokens: 16000,
         temperature: 0.7,
-        return_full_text: false
+        return_full_text: false,
+        do_sample: true
       }
     };
   }
 
-  return { messages, max_tokens: 16000 };
+  return { messages, max_tokens: 32000 };
 }
+
+// ========================================
+// LANGUAGE DETECTION
+// ========================================
+
+function detectLanguage(text) {
+  const indonesianWords = [
+    'apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'yang', 'dengan', 
+    'untuk', 'dari', 'ini', 'itu', 'seperti', 'lengkap', 'mohon'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  const count = indonesianWords.filter(w => lowerText.includes(w)).length;
+
+  return count >= 2 ? 'indonesian' : 'english';
+}
+
+// ========================================
+// UTILITY FUNCTIONS
+// ========================================
 
 function buildHeaders(provider) {
   const headers = { 'Content-Type': 'application/json' };
@@ -809,7 +563,7 @@ function buildHeaders(provider) {
   if (providerType === 'openrouter') {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
     headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://nextgenai.vercel.app';
-    headers['X-Title'] = 'NextGenAI Comprehensive Code Generator';
+    headers['X-Title'] = 'NextGenAI Ultimate Code Generator';
   }
 
   if (providerType === 'anthropic') {
