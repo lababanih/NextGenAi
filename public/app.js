@@ -1,5 +1,5 @@
 // app.js - NextGenAI Frontend Logic
-// Fixed version with complete functionality
+// Enhanced with Artifacts System & Multi-Language Learning
 
 // ========================================
 // STATE MANAGEMENT
@@ -9,7 +9,7 @@ let conversationHistory = [];
 let currentModel = 'nefa';
 let isProcessing = false;
 
-// Load AI sources from localStorage (configured in admin panel)
+// Load AI sources from localStorage
 function getAISources() {
   try {
     const sources = localStorage.getItem('ai_sources');
@@ -21,22 +21,100 @@ function getAISources() {
 }
 
 // ========================================
+// CODE DETECTION & ARTIFACT SYSTEM
+// ========================================
+
+// Detect if response should create artifact
+function shouldCreateArtifact(message, response) {
+  // Keywords that suggest code/artifact creation
+  const artifactKeywords = [
+    'create', 'build', 'make', 'generate', 'buat', 'bikin',
+    'code', 'script', 'program', 'kode', 'skrip',
+    'website', 'app', 'aplikasi', 'game',
+    'html', 'css', 'javascript', 'python', 'lua', 'roblox',
+    'calculator', 'kalkulator', 'dashboard', 'panel', 'admin'
+  ];
+
+  const messageLower = message.toLowerCase();
+  const hasKeyword = artifactKeywords.some(k => messageLower.includes(k));
+
+  // Check if response contains code blocks
+  const hasCodeBlock = response.includes('```');
+
+  // Check if response is primarily code (more than 10 lines)
+  const codeLines = (response.match(/\n/g) || []).length;
+  const isPrimarilyCode = codeLines > 10 && hasCodeBlock;
+
+  return (hasKeyword && hasCodeBlock) || isPrimarilyCode;
+}
+
+// Extract code from response
+function extractCode(response) {
+  // Try to extract code from markdown code blocks
+  const codeBlockRegex = /```(\w+)?\n([\s\S]+?)\n```/g;
+  const matches = [...response.matchAll(codeBlockRegex)];
+
+  if (matches.length > 0) {
+    return {
+      language: matches[0][1] || 'text',
+      code: matches[0][2],
+      fullResponse: response
+    };
+  }
+
+  // If no code blocks but looks like code, return as-is
+  if (response.includes('function') || response.includes('local') || response.includes('def')) {
+    return {
+      language: detectLanguage(response),
+      code: response,
+      fullResponse: response
+    };
+  }
+
+  return null;
+}
+
+// Detect programming language
+function detectLanguage(code) {
+  const patterns = {
+    'javascript': /\b(function|const|let|var|=>|\{|\})\b/,
+    'python': /\b(def|import|class|print|if __name__)\b/,
+    'lua': /\b(local|function|end|then|do)\b/,
+    'html': /<\/?[a-z][\s\S]*>/i,
+    'css': /\{[\s\S]*:[^\}]*\}/,
+    'java': /\b(public|private|class|static|void)\b/,
+    'cpp': /\b(#include|int main|std::)\b/,
+    'csharp': /\b(using|namespace|public class)\b/
+  };
+
+  for (const [lang, pattern] of Object.entries(patterns)) {
+    if (pattern.test(code)) return lang;
+  }
+
+  return 'text';
+}
+
+// Generate artifact title from user message
+function generateArtifactTitle(message) {
+  // Extract main topic from message
+  const words = message.split(' ').slice(0, 5);
+  return words.join(' ').replace(/[^\w\s]/g, '').substring(0, 40);
+}
+
+// ========================================
 // UI FUNCTIONS
 // ========================================
 
-// Toggle model selector dropdown
 function toggleModelSelector() {
   const selector = document.getElementById('modelSelector');
   selector.classList.toggle('hidden');
 }
 
-// Select model
 function selectModel(model, event) {
   if (event) event.stopPropagation();
   
   currentModel = model;
   
-  // Update UI
   const modelNames = {
     'nefa': 'Nefa',
     'mou': 'Mou 🔍',
@@ -47,27 +125,22 @@ function selectModel(model, event) {
   document.getElementById('currentModelName').textContent = modelNames[model] || 'Nefa';
   document.getElementById('modelInfo').textContent = `Using: ${modelNames[model] || 'Nefa'}`;
   
-  // Update active state
   document.querySelectorAll('.model-item').forEach(item => {
     item.classList.remove('active');
   });
   event?.target.closest('.model-item')?.classList.add('active');
   
-  // Hide selector
   document.getElementById('modelSelector').classList.add('hidden');
   
-  // Show notification
   updateStatus(`Switched to ${modelNames[model]}`);
   setTimeout(() => updateStatus('Ready'), 2000);
 }
 
-// Auto-resize textarea
 function autoResize(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
 }
 
-// Handle Enter key
 function handleKeyPress(event) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
@@ -75,12 +148,10 @@ function handleKeyPress(event) {
   }
 }
 
-// Update status text
 function updateStatus(text) {
   document.getElementById('statusText').textContent = text;
 }
 
-// Clear chat
 function clearChat() {
   if (confirm('Clear all messages?')) {
     conversationHistory = [];
@@ -115,7 +186,6 @@ function clearChat() {
 // MESSAGE HANDLING
 // ========================================
 
-// Send message
 async function sendMessage() {
   if (isProcessing) return;
   
@@ -124,26 +194,21 @@ async function sendMessage() {
   
   if (!message) return;
   
-  // Clear input
   input.value = '';
   input.style.height = 'auto';
   
-  // Add user message to UI
   addMessage('user', message);
   
-  // Add to conversation history
   conversationHistory.push({
     role: 'user',
     content: message
   });
   
-  // Show typing indicator
   isProcessing = true;
   const typingId = addTypingIndicator();
   updateStatus('Thinking...');
   
   try {
-    // Route to appropriate handler based on model
     let response;
     
     switch (currentModel) {
@@ -163,25 +228,52 @@ async function sendMessage() {
         response = await handleNefaQuery(message);
     }
     
-    // Remove typing indicator
     removeTypingIndicator(typingId);
     
-    // Add AI response
-    if (response.text) {
-      addMessage('assistant', response.text);
-      conversationHistory.push({
-        role: 'assistant',
-        content: response.text
-      });
+    // Check if should create artifact
+    if (response.text && shouldCreateArtifact(message, response.text)) {
+      const extracted = extractCode(response.text);
+      
+      if (extracted) {
+        // Add explanation text (without code)
+        const explanation = response.text.replace(/```[\s\S]*?```/g, '').trim();
+        if (explanation) {
+          addMessage('assistant', explanation);
+        }
+        
+        // Add artifact
+        addArtifactMessage({
+          title: generateArtifactTitle(message),
+          language: extracted.language,
+          code: extracted.code
+        });
+        
+        conversationHistory.push({
+          role: 'assistant',
+          content: response.text
+        });
+      } else {
+        // Normal message
+        addMessage('assistant', response.text);
+        conversationHistory.push({
+          role: 'assistant',
+          content: response.text
+        });
+      }
+    } else {
+      // Normal message
+      if (response.text) {
+        addMessage('assistant', response.text);
+        conversationHistory.push({
+          role: 'assistant',
+          content: response.text
+        });
+      }
     }
     
-    // Handle special responses (images, artifacts, etc)
+    // Handle special responses
     if (response.imageUrl) {
       addImageMessage(response.imageUrl, response.prompt);
-    }
-    
-    if (response.artifact) {
-      addArtifactMessage(response.artifact);
     }
     
     updateStatus('Ready');
@@ -189,7 +281,7 @@ async function sendMessage() {
   } catch (error) {
     console.error('Error:', error);
     removeTypingIndicator(typingId);
-    addMessage('assistant', `❌ Error: ${error.message}\n\nPlease check:\n- API keys configured in admin panel\n- Internet connection\n- API rate limits`);
+    addMessage('assistant', `❌ Error: ${error.message}\n\nPlease check:\n• API keys configured in admin panel\n• Internet connection\n• API rate limits`);
     updateStatus('Error occurred');
   } finally {
     isProcessing = false;
@@ -197,10 +289,9 @@ async function sendMessage() {
 }
 
 // ========================================
-// MODEL HANDLERS
+// MODEL HANDLERS WITH MULTI-LANGUAGE LEARNING
 // ========================================
 
-// Nefa: Self-learning AI (Smart mode)
 async function handleNefaQuery(message) {
   const sources = getAISources();
   const enabledSources = sources.filter(s => s.enabled && s.apiKey);
@@ -209,13 +300,16 @@ async function handleNefaQuery(message) {
     throw new Error('No AI sources configured. Please setup API keys in admin panel (/admin.html).');
   }
   
-  updateStatus('Querying AI sources...');
+  // Enhance prompt for better code generation
+  const enhancedMessage = enhancePromptForCodeGeneration(message);
+  
+  updateStatus('Learning from multiple AIs...');
   
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      messages: conversationHistory,
+      messages: [...conversationHistory.slice(-5), { role: 'user', content: enhancedMessage }],
       aiSources: enabledSources,
       mode: enabledSources.length > 1 ? 'smart' : 'fast'
     })
@@ -235,22 +329,18 @@ async function handleNefaQuery(message) {
   };
 }
 
-// Mou: Research AI with web search
 async function handleMouQuery(message) {
   let queryMessage = message;
   
-  // Check if query needs web search
   const needsSearch = detectSearchIntent(message);
   
   if (needsSearch) {
     updateStatus('Searching the web...');
     
     try {
-      // Perform web search
       const searchResults = await performWebSearch(message);
       
       if (searchResults.length > 0) {
-        // Enhance query with search results
         queryMessage = `
 ${message}
 
@@ -259,19 +349,15 @@ ${searchResults.map((r, i) => `${i+1}. ${r.title}: ${r.snippet}`).join('\n')}
 
 Please provide a comprehensive answer using these sources.
 `;
-        
-        conversationHistory[conversationHistory.length - 1].content = queryMessage;
       }
     } catch (error) {
       console.warn('Web search failed, continuing with normal query:', error);
     }
   }
   
-  // Query AI with enhanced context
   return await handleNefaQuery(queryMessage);
 }
 
-// Nevi: Image generation
 async function handleNeviQuery(message) {
   updateStatus('Generating image...');
   
@@ -300,22 +386,45 @@ async function handleNeviQuery(message) {
 }
 
 // ========================================
+// PROMPT ENHANCEMENT FOR CODE GENERATION
+// ========================================
+
+function enhancePromptForCodeGeneration(message) {
+  const codeKeywords = ['create', 'build', 'make', 'generate', 'buat', 'bikin', 'script', 'code', 'program'];
+  const hasCodeKeyword = codeKeywords.some(k => message.toLowerCase().includes(k));
+  
+  if (!hasCodeKeyword) {
+    return message;
+  }
+  
+  // Add code generation guidelines
+  return `${message}
+
+IMPORTANT INSTRUCTIONS:
+- Provide complete, working code that can be used immediately
+- Include clear comments explaining each section
+- Follow best practices and industry standards
+- Make code clean, efficient, and well-structured
+- If multiple files needed, organize them clearly
+- Include example usage if applicable
+- Wrap code in markdown code blocks with language identifier`;
+}
+
+// ========================================
 // HELPER FUNCTIONS
 // ========================================
 
-// Detect if query needs web search
 function detectSearchIntent(message) {
   const searchKeywords = [
-    'latest', 'recent', 'current', 'today', 'news',
-    'what is happening', 'update', 'search', 'find',
-    'when did', 'who is', 'what happened'
+    'latest', 'recent', 'current', 'today', 'news', 'terbaru', 'sekarang',
+    'what is happening', 'update', 'search', 'find', 'cari',
+    'when did', 'who is', 'what happened', 'kapan', 'siapa'
   ];
   
   const lowerMessage = message.toLowerCase();
   return searchKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
-// Perform web search
 async function performWebSearch(query) {
   try {
     const response = await fetch('/api/tools', {
@@ -328,7 +437,7 @@ async function performWebSearch(query) {
     });
     
     if (!response.ok) {
-      console.warn('Web search failed, continuing without search results');
+      console.warn('Web search failed');
       return [];
     }
     
@@ -344,7 +453,6 @@ async function performWebSearch(query) {
 // UI MESSAGE FUNCTIONS
 // ========================================
 
-// Add message to UI
 function addMessage(role, content) {
   const messagesDiv = document.getElementById('messages');
   const messageDiv = document.createElement('div');
@@ -362,7 +470,6 @@ function addMessage(role, content) {
       </div>
     `;
   } else {
-    // Parse markdown for AI responses
     const formattedContent = parseMarkdown(content);
     
     messageDiv.innerHTML = `
@@ -381,7 +488,6 @@ function addMessage(role, content) {
   scrollToBottom();
 }
 
-// Add typing indicator
 function addTypingIndicator() {
   const messagesDiv = document.getElementById('messages');
   const typingDiv = document.createElement('div');
@@ -408,13 +514,11 @@ function addTypingIndicator() {
   return 'typing-indicator';
 }
 
-// Remove typing indicator
 function removeTypingIndicator(id) {
   const indicator = document.getElementById(id);
   if (indicator) indicator.remove();
 }
 
-// Add image message
 function addImageMessage(imageUrl, prompt) {
   const messagesDiv = document.getElementById('messages');
   const imageDiv = document.createElement('div');
@@ -438,83 +542,154 @@ function addImageMessage(imageUrl, prompt) {
   scrollToBottom();
 }
 
-// Add artifact message
+// ========================================
+// ENHANCED ARTIFACT SYSTEM
+// ========================================
+
 function addArtifactMessage(artifact) {
   const messagesDiv = document.getElementById('messages');
-  const artifactDiv = document.createElement('div');
-  artifactDiv.className = 'artifact-container';
-  
   const artifactId = 'artifact-' + Date.now();
+  
+  // Create artifact container
+  const artifactDiv = document.createElement('div');
+  artifactDiv.className = 'artifact-container ml-11';
+  
+  // Determine if code can be previewed
+  const canPreview = ['html', 'javascript', 'css'].includes(artifact.language.toLowerCase()) || 
+                     artifact.code.includes('<html') || 
+                     artifact.code.includes('<!DOCTYPE');
   
   artifactDiv.innerHTML = `
     <div class="artifact-header">
-      <div class="text-white font-bold">${escapeHtml(artifact.title || 'Code Artifact')}</div>
-      <div class="flex gap-2">
-        <button onclick="copyArtifact('${artifactId}')" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white">
+      <div>
+        <div class="text-white font-bold text-lg">${escapeHtml(artifact.title || 'Code')}</div>
+        <div class="text-white/70 text-xs mt-1">Language: ${artifact.language}</div>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        ${canPreview ? `
+        <button onclick="runArtifact('${artifactId}')" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 rounded text-sm text-white font-medium transition-colors">
+          ▶️ Run
+        </button>
+        ` : ''}
+        <button onclick="copyArtifact('${artifactId}')" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm text-white transition-colors">
           📋 Copy
         </button>
-        <button onclick="downloadArtifact('${artifactId}')" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white">
+        <button onclick="downloadArtifact('${artifactId}', '${artifact.language}')" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm text-white transition-colors">
           💾 Download
         </button>
       </div>
     </div>
+    ${canPreview ? `
     <div class="artifact-tabs">
-      <div class="artifact-tab active" onclick="switchArtifactTab('${artifactId}', 'preview')">
-        👁️ Preview
-      </div>
-      <div class="artifact-tab" onclick="switchArtifactTab('${artifactId}', 'code')">
+      <div class="artifact-tab active" onclick="switchArtifactTab('${artifactId}', 'code')">
         💻 Code
       </div>
+      <div class="artifact-tab" onclick="switchArtifactTab('${artifactId}', 'preview')">
+        👁️ Preview
+      </div>
     </div>
-    <div id="${artifactId}-preview" class="artifact-preview">
-      <iframe srcdoc="${escapeHtml(artifact.code)}" class="w-full h-full min-h-[400px] border-0"></iframe>
+    ` : ''}
+    <div id="${artifactId}-code" class="artifact-code" style="display: block;">
+      <pre class="language-${artifact.language}"><code>${escapeHtml(artifact.code)}</code></pre>
     </div>
-    <div id="${artifactId}-code" class="artifact-code hidden">
-      ${escapeHtml(artifact.code)}
+    ${canPreview ? `
+    <div id="${artifactId}-preview" class="artifact-preview" style="display: none;">
+      <iframe id="${artifactId}-iframe" class="w-full border-0" style="min-height: 400px; background: white;"></iframe>
     </div>
+    ` : ''}
   `;
+  
+  // Store code in data attribute
+  artifactDiv.dataset.code = artifact.code;
+  artifactDiv.dataset.language = artifact.language;
   
   messagesDiv.appendChild(artifactDiv);
   scrollToBottom();
 }
 
-// Switch artifact tab
 function switchArtifactTab(artifactId, tab) {
-  // Update tab active state
-  const container = document.getElementById(artifactId + '-preview').parentElement.parentElement;
-  container.querySelectorAll('.artifact-tab').forEach(t => t.classList.remove('active'));
+  const codeDiv = document.getElementById(artifactId + '-code');
+  const previewDiv = document.getElementById(artifactId + '-preview');
+  
+  if (!previewDiv) return;
+  
+  // Update tabs
+  const container = codeDiv.parentElement;
+  const tabs = container.querySelectorAll('.artifact-tab');
+  tabs.forEach(t => t.classList.remove('active'));
   event.target.classList.add('active');
   
   // Show/hide content
-  document.getElementById(artifactId + '-preview').classList.toggle('hidden', tab !== 'preview');
-  document.getElementById(artifactId + '-code').classList.toggle('hidden', tab !== 'code');
+  if (tab === 'code') {
+    codeDiv.style.display = 'block';
+    previewDiv.style.display = 'none';
+  } else {
+    codeDiv.style.display = 'none';
+    previewDiv.style.display = 'block';
+    
+    // Load preview if not already loaded
+    const iframe = document.getElementById(artifactId + '-iframe');
+    if (!iframe.src && !iframe.srcdoc) {
+      const container = codeDiv.parentElement;
+      const code = container.dataset.code;
+      iframe.srcdoc = code;
+    }
+  }
 }
 
-// Copy artifact code
+function runArtifact(artifactId) {
+  const container = document.getElementById(artifactId + '-code').parentElement;
+  const code = container.dataset.code;
+  const iframe = document.getElementById(artifactId + '-iframe');
+  
+  if (iframe) {
+    iframe.srcdoc = code;
+    switchArtifactTab(artifactId, 'preview');
+    updateStatus('Code executed!');
+    setTimeout(() => updateStatus('Ready'), 2000);
+  }
+}
+
 function copyArtifact(artifactId) {
-  const codeElement = document.getElementById(artifactId + '-code');
-  const code = codeElement.textContent;
+  const container = document.getElementById(artifactId + '-code').parentElement;
+  const code = container.dataset.code;
   
   navigator.clipboard.writeText(code).then(() => {
-    updateStatus('Code copied to clipboard!');
+    updateStatus('✅ Code copied to clipboard!');
     setTimeout(() => updateStatus('Ready'), 2000);
+  }).catch(err => {
+    console.error('Copy failed:', err);
+    updateStatus('❌ Copy failed');
   });
 }
 
-// Download artifact
-function downloadArtifact(artifactId) {
-  const codeElement = document.getElementById(artifactId + '-code');
-  const code = codeElement.textContent;
+function downloadArtifact(artifactId, language) {
+  const container = document.getElementById(artifactId + '-code').parentElement;
+  const code = container.dataset.code;
   
-  const blob = new Blob([code], { type: 'text/html' });
+  const extensions = {
+    'javascript': 'js',
+    'python': 'py',
+    'lua': 'lua',
+    'html': 'html',
+    'css': 'css',
+    'java': 'java',
+    'cpp': 'cpp',
+    'csharp': 'cs'
+  };
+  
+  const ext = extensions[language.toLowerCase()] || 'txt';
+  const filename = `code-${Date.now()}.${ext}`;
+  
+  const blob = new Blob([code], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `artifact-${Date.now()}.html`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
   
-  updateStatus('Downloaded!');
+  updateStatus(`✅ Downloaded as ${filename}`);
   setTimeout(() => updateStatus('Ready'), 2000);
 }
 
@@ -522,7 +697,6 @@ function downloadArtifact(artifactId) {
 // UTILITY FUNCTIONS
 // ========================================
 
-// Scroll to bottom
 function scrollToBottom() {
   const container = document.getElementById('messagesContainer');
   setTimeout(() => {
@@ -530,14 +704,12 @@ function scrollToBottom() {
   }, 100);
 }
 
-// Escape HTML
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-// Simple markdown parser
 function parseMarkdown(text) {
   let html = escapeHtml(text);
   
@@ -547,22 +719,21 @@ function parseMarkdown(text) {
   // Italic
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   
-  // Code blocks
-  html = html.replace(/```(\w+)?\n([\s\S]+?)\n```/g, '<pre class="bg-gray-100 p-3 rounded my-2 overflow-x-auto"><code>$2</code></pre>');
-  
   // Inline code
   html = html.replace(/`(.+?)`/g, '<code>$1</code>');
   
+  // Headers
+  html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-4 mb-2">$1</h1>');
+  
   // Lists
   html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul class="list-disc ml-5 my-2">$1</ul>');
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul class="list-disc ml-5 my-2">$&</ul>');
   
-  // Paragraphs
-  html = html.replace(/\n\n/g, '</p><p>');
-  html = '<p>' + html + '</p>';
-  
-  // Remove empty paragraphs
-  html = html.replace(/<p><\/p>/g, '');
+  // Line breaks to paragraphs
+  html = html.split('\n\n').map(p => p.trim() ? `<p class="my-2">${p}</p>` : '').join('');
   
   return html;
 }
@@ -572,15 +743,17 @@ function parseMarkdown(text) {
 // ========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('NextGenAI Frontend initialized');
+  console.log('✨ NextGenAI Enhanced Edition initialized');
+  console.log('🎨 Artifact system enabled');
+  console.log('🌍 Multi-language learning active');
   
-  // Check if AI sources are configured
   const sources = getAISources();
   if (sources.length === 0 || !sources.some(s => s.enabled && s.apiKey)) {
-    console.warn('No AI sources configured. User will be prompted.');
+    console.warn('⚠️ No AI sources configured. Please setup in admin panel.');
+  } else {
+    console.log(`✅ ${sources.filter(s => s.enabled && s.apiKey).length} AI source(s) ready`);
   }
   
-  // Focus input
   document.getElementById('userInput')?.focus();
 });
 
@@ -594,3 +767,4 @@ window.clearChat = clearChat;
 window.switchArtifactTab = switchArtifactTab;
 window.copyArtifact = copyArtifact;
 window.downloadArtifact = downloadArtifact;
+window.runArtifact = runArtifact;
