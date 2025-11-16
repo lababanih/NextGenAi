@@ -559,23 +559,47 @@ function addArtifactMessage(artifact) {
                      artifact.code.includes('<html') || 
                      artifact.code.includes('<!DOCTYPE');
   
+  // Map language names to Prism.js language classes
+  const languageMap = {
+    'javascript': 'javascript',
+    'python': 'python',
+    'lua': 'lua',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c++': 'cpp',
+    'csharp': 'csharp',
+    'c#': 'csharp',
+    'go': 'go',
+    'rust': 'rust',
+    'typescript': 'typescript',
+    'jsx': 'jsx',
+    'html': 'markup',
+    'css': 'css',
+    'sql': 'sql',
+    'text': 'text'
+  };
+  
+  const prismLanguage = languageMap[artifact.language.toLowerCase()] || 'text';
+  
   artifactDiv.innerHTML = `
     <div class="artifact-header">
       <div>
-        <div class="text-white font-bold text-lg">${escapeHtml(artifact.title || 'Code')}</div>
-        <div class="text-white/70 text-xs mt-1">Language: ${artifact.language}</div>
+        <div class="text-white font-bold text-lg">✨ ${escapeHtml(artifact.title || 'Code')}</div>
+        <div class="text-white/80 text-sm mt-1">
+          <span class="px-2 py-0.5 bg-white/20 rounded text-xs font-medium">${artifact.language}</span>
+        </div>
       </div>
       <div class="flex gap-2 flex-wrap">
         ${canPreview ? `
-        <button onclick="runArtifact('${artifactId}')" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 rounded text-sm text-white font-medium transition-colors">
-          ▶️ Run
+        <button onclick="runArtifact('${artifactId}')" class="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-lg text-sm text-white font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
+          <span>▶️</span> Run Code
         </button>
         ` : ''}
-        <button onclick="copyArtifact('${artifactId}')" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm text-white transition-colors">
-          📋 Copy
+        <button onclick="copyArtifact('${artifactId}')" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm text-white font-medium transition-all flex items-center gap-2">
+          <span>📋</span> Copy
         </button>
-        <button onclick="downloadArtifact('${artifactId}', '${artifact.language}')" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm text-white transition-colors">
-          💾 Download
+        <button onclick="downloadArtifact('${artifactId}', '${artifact.language}')" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm text-white font-medium transition-all flex items-center gap-2">
+          <span>💾</span> Download
         </button>
       </div>
     </div>
@@ -585,16 +609,16 @@ function addArtifactMessage(artifact) {
         💻 Code
       </div>
       <div class="artifact-tab" onclick="switchArtifactTab('${artifactId}', 'preview')">
-        👁️ Preview
+        👁️ Live Preview
       </div>
     </div>
     ` : ''}
-    <div id="${artifactId}-code" class="artifact-code" style="display: block;">
-      <pre class="language-${artifact.language}"><code>${escapeHtml(artifact.code)}</code></pre>
+    <div id="${artifactId}-code" class="artifact-code-container" style="display: block;">
+      <pre class="language-${prismLanguage} line-numbers"><code class="language-${prismLanguage}">${escapeHtml(artifact.code)}</code></pre>
     </div>
     ${canPreview ? `
     <div id="${artifactId}-preview" class="artifact-preview" style="display: none;">
-      <iframe id="${artifactId}-iframe" class="w-full border-0" style="min-height: 400px; background: white;"></iframe>
+      <iframe id="${artifactId}-iframe" class="w-full border-0" style="min-height: 500px; background: white;"></iframe>
     </div>
     ` : ''}
   `;
@@ -604,6 +628,15 @@ function addArtifactMessage(artifact) {
   artifactDiv.dataset.language = artifact.language;
   
   messagesDiv.appendChild(artifactDiv);
+  
+  // Apply Prism.js syntax highlighting
+  setTimeout(() => {
+    const codeBlock = artifactDiv.querySelector('code');
+    if (codeBlock && window.Prism) {
+      Prism.highlightElement(codeBlock);
+    }
+  }, 0);
+  
   scrollToBottom();
 }
 
