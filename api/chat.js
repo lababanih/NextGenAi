@@ -1,6 +1,7 @@
 // api/chat.js
-// Hybrid Strategy: Smart model routing + Multi-API key load balancing
-// Automatically selects best model based on complexity
+// ULTIMATE UNLIMITED TOKEN SYSTEM
+// Automatically handles ANY complexity with smart routing
+// FREE (Groq 32K) + FREE Backup (Gemini 2M) + Premium (Claude 200K)
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,408 +17,601 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, aiSources, mode = 'smart' } = req.body;
+    const { messages, aiSources } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Messages array required' });
     }
 
-    // Get all configured providers
-    let allProviders = getEnabledProviders(aiSources);
+    // Get providers and enhance with model capabilities
+    let providers = getEnabledProviders(aiSources);
+    providers = providers.map(p => enhanceProviderInfo(p));
 
-    if (allProviders.length === 0) {
+    if (providers.length === 0) {
       return res.status(500).json({
-        error: 'No AI providers configured'
+        error: 'No AI providers configured',
+        message: 'Please add at least one API key in admin panel'
       });
     }
 
-    console.log(`🎯 Available providers: ${allProviders.length}`);
+    console.log(`🚀 ULTIMATE System initialized with ${providers.length} provider(s)`);
 
-    // Detect language & analyze complexity
+    // Detect language
     const userLanguage = detectLanguage(messages[messages.length - 1].content);
-    const complexity = analyzeComplexity(messages[messages.length - 1].content);
     
-    console.log(`📊 Complexity: ${complexity.level}, Estimated tokens needed: ${complexity.tokensNeeded}`);
+    // Analyze complexity deeply
+    const analysis = analyzeComplexityDeep(messages[messages.length - 1].content);
+    
+    console.log(`📊 Analysis:
+    - Complexity: ${analysis.level}
+    - Files needed: ${analysis.filesNeeded}
+    - Estimated tokens: ${analysis.estimatedTokens}
+    - Estimated lines: ${analysis.estimatedLines}`);
 
-    // SMART ROUTING: Select best provider(s) based on complexity
-    const selectedProviders = smartRouting(allProviders, complexity);
+    // Select optimal strategy
+    const strategy = selectOptimalStrategy(providers, analysis);
     
-    console.log(`🚀 Selected: ${selectedProviders.map(p => `${p.name} (${p.maxTokens} tokens)`).join(', ')}`);
+    console.log(`🎯 Selected strategy: ${strategy.name}
+    - Model: ${strategy.model.name} (${strategy.model.maxTokens} tokens)
+    - Approach: ${strategy.approach}
+    - Turns: ${strategy.turns || 1}`);
 
     // Create enhanced prompt
-    const enhancedMessages = createUltimatePrompt(messages, userLanguage, complexity);
+    const enhancedMessages = createUltimatePrompt(
+      messages, 
+      userLanguage, 
+      analysis,
+      strategy
+    );
 
-    // Execute with selected strategy
-    let result;
+    // Execute strategy
+    const result = await executeStrategy(strategy, enhancedMessages, providers);
     
-    if (complexity.tokensNeeded > 16000) {
-      // MULTI-TURN strategy for very complex requests
-      console.log('📚 Using MULTI-TURN generation strategy...');
-      result = await multiTurnGeneration(selectedProviders, enhancedMessages, complexity);
-    } else {
-      // SINGLE-TURN with best model
-      console.log('⚡ Using SINGLE-TURN generation strategy...');
-      result = await singleTurnGeneration(selectedProviders, enhancedMessages);
-    }
-    
+    console.log(`✅ Generation complete:
+    - Output tokens: ${result.tokensGenerated}
+    - Output lines: ${result.linesGenerated}
+    - Time: ${result.duration}ms
+    - Cost: $${result.cost.toFixed(4)}`);
+
     return res.json({
       answer: result.answer,
-      mode: result.mode,
-      provider: result.provider,
-      tokensUsed: result.tokensUsed,
-      confidence: result.confidence,
-      language: userLanguage,
-      complexity: complexity.level
+      metadata: {
+        strategy: strategy.name,
+        model: strategy.model.name,
+        tokensGenerated: result.tokensGenerated,
+        linesGenerated: result.linesGenerated,
+        confidence: result.confidence,
+        duration: result.duration,
+        cost: result.cost,
+        language: userLanguage,
+        complexity: analysis.level
+      }
     });
 
   } catch (error) {
-    console.error('❌ Generation error:', error);
+    console.error('❌ Ultimate system error:', error);
     return res.status(500).json({
-      error: 'AI request failed',
+      error: 'Generation failed',
       message: error.message
     });
   }
 }
 
 // ========================================
-// SMART ROUTING: Select best provider
+// DEEP COMPLEXITY ANALYSIS
 // ========================================
 
-function smartRouting(providers, complexity) {
-  const tokensNeeded = complexity.tokensNeeded;
-  
-  // Group providers by same model (for load balancing)
-  const groupedByModel = {};
-  
-  providers.forEach(provider => {
-    const key = `${provider.provider}-${provider.model}`;
-    if (!groupedByModel[key]) {
-      groupedByModel[key] = [];
-    }
-    groupedByModel[key].push(provider);
-  });
-  
-  // Rank models by max_tokens capability
-  const rankedGroups = Object.values(groupedByModel).map(group => {
-    const sample = group[0];
-    const maxTokens = getModelMaxTokens(sample.provider, sample.model);
-    
-    return {
-      providers: group,
-      maxTokens,
-      model: sample.model,
-      provider: sample.provider
-    };
-  }).sort((a, b) => b.maxTokens - a.maxTokens);
-  
-  // Select providers that can handle the complexity
-  const suitable = rankedGroups.filter(g => g.maxTokens >= tokensNeeded);
-  
-  if (suitable.length === 0) {
-    console.warn('⚠️ No provider can handle tokens needed, using largest available');
-    return rankedGroups[0].providers;
-  }
-  
-  // Return all API keys for the best model (for load balancing)
-  return suitable[0].providers;
-}
-
-function getModelMaxTokens(provider, model) {
-  // Model-specific max_tokens
-  const limits = {
-    // Groq models (FREE!)
-    'llama-3.3-70b-versatile': 32000,
-    'llama-3.1-70b-versatile': 8000,
-    'llama-3.2-90b-vision-preview': 8000,
-    
-    // OpenRouter models
-    'openai/gpt-4-turbo': 128000,
-    'openai/gpt-4': 8192,
-    'openai/gpt-3.5-turbo': 16385,
-    'anthropic/claude-3-opus': 200000,
-    'anthropic/claude-3.5-sonnet': 200000,
-    'google/gemini-pro-1.5': 1000000,
-    
-    // HuggingFace models
-    'mistralai/Mistral-7B-Instruct-v0.2': 8000,
-  };
-  
-  // Check exact match
-  if (limits[model]) return limits[model];
-  
-  // Check by provider default
-  const providerDefaults = {
-    'groq': 8000,
-    'openrouter': 8000,
-    'openai': 8000,
-    'anthropic': 100000,
-    'huggingface': 8000
-  };
-  
-  return providerDefaults[provider] || 4096;
-}
-
-// ========================================
-// COMPLEXITY ANALYSIS
-// ========================================
-
-function analyzeComplexity(text) {
+function analyzeComplexityDeep(text) {
   const lowerText = text.toLowerCase();
   
-  // Indicators of complexity
-  const fileKeywords = ['file', 'files', 'module', 'modul', 'terpisah', 'separate'];
-  const hasFileRequest = fileKeywords.some(k => lowerText.includes(k));
+  // Detect explicit file requests
+  const fileMatch = text.match(/(\d+)\s*(file|files|modul)/i);
+  const explicitFiles = fileMatch ? parseInt(fileMatch[1]) : 0;
   
-  const comprehensiveKeywords = ['lengkap', 'complete', 'full', 'seperti', 'like', 'kohl', 'claude'];
-  const isComprehensive = comprehensiveKeywords.some(k => lowerText.includes(k));
-  
+  // Count features/requirements
   const numberedItems = (text.match(/\d+\./g) || []).length;
-  const featureCount = ['dengan', 'with', 'include', 'fitur'].filter(w => lowerText.includes(w)).length;
+  const bulletPoints = (text.match(/[-•*]\s/g) || []).length;
   
-  // Estimate files needed
+  // Detect comprehensive keywords
+  const comprehensiveKeywords = [
+    'lengkap', 'complete', 'full', 'penuh',
+    'seperti', 'like', 'kohl', 'claude', 'sonnet',
+    'production', 'produksi', 'professional', 'profesional',
+    'system', 'sistem', 'framework'
+  ];
+  const comprehensiveScore = comprehensiveKeywords.filter(k => lowerText.includes(k)).length;
+  
+  // Detect feature keywords
+  const featureKeywords = ['dengan', 'with', 'include', 'termasuk', 'fitur', 'feature'];
+  const featureScore = featureKeywords.filter(k => lowerText.includes(k)).length;
+  
+  // Calculate files needed
   let filesNeeded = 1;
   
-  if (text.match(/\d+\s*(file|files|modul)/i)) {
-    const match = text.match(/(\d+)\s*(file|files|modul)/i);
-    filesNeeded = parseInt(match[1]);
-  } else if (isComprehensive || numberedItems >= 5) {
+  if (explicitFiles > 0) {
+    filesNeeded = explicitFiles;
+  } else if (comprehensiveScore >= 2 || numberedItems >= 5) {
     filesNeeded = 5;
-  } else if (numberedItems >= 3) {
+  } else if (comprehensiveScore >= 1 || numberedItems >= 3) {
     filesNeeded = 3;
-  } else if (hasFileRequest) {
+  } else if (featureScore >= 2 || bulletPoints >= 3) {
     filesNeeded = 2;
   }
   
-  // Estimate tokens needed (rough calculation)
-  // Assume: 1 file ≈ 3000-5000 tokens
-  const tokensPerFile = 4000;
-  const tokensNeeded = filesNeeded * tokensPerFile + 2000; // +2000 for instructions & examples
+  // Estimate lines per file
+  const linesPerFile = filesNeeded <= 1 ? 150 : 
+                       filesNeeded <= 2 ? 250 :
+                       filesNeeded <= 3 ? 300 :
+                       filesNeeded <= 5 ? 280 : 250;
   
+  const estimatedLines = filesNeeded * linesPerFile;
+  
+  // Estimate tokens (1 line ≈ 25 tokens average)
+  const estimatedTokens = estimatedLines * 25 + 2000; // +2000 for instructions
+  
+  // Determine complexity level
   let level = 'simple';
-  if (tokensNeeded > 20000) level = 'very-complex';
-  else if (tokensNeeded > 12000) level = 'complex';
-  else if (tokensNeeded > 6000) level = 'medium';
-  else if (tokensNeeded > 3000) level = 'basic';
+  if (estimatedTokens > 60000) level = 'extreme';
+  else if (estimatedTokens > 35000) level = 'very-complex';
+  else if (estimatedTokens > 15000) level = 'complex';
+  else if (estimatedTokens > 6000) level = 'medium';
+  else if (estimatedTokens > 2000) level = 'basic';
   
   return {
     level,
     filesNeeded,
-    tokensNeeded,
-    isComprehensive
+    estimatedLines,
+    estimatedTokens,
+    comprehensiveScore,
+    featureCount: numberedItems + bulletPoints
   };
 }
 
 // ========================================
-// SINGLE-TURN GENERATION
+// PROVIDER INFO ENHANCEMENT
 // ========================================
 
-async function singleTurnGeneration(providers, messages) {
-  // Load balance across multiple API keys for same model
-  const selectedProvider = providers[Math.floor(Math.random() * providers.length)];
+function enhanceProviderInfo(provider) {
+  const enhanced = { ...provider };
   
-  console.log(`🎯 Using: ${selectedProvider.name} (Key #${providers.indexOf(selectedProvider) + 1}/${providers.length})`);
+  // Get model capabilities
+  const capabilities = getModelCapabilities(provider.provider, provider.model);
   
-  try {
-    const result = await queryAIProvider(selectedProvider, messages);
+  enhanced.maxTokens = capabilities.maxTokens;
+  enhanced.costPerToken = capabilities.costPerToken;
+  enhanced.speed = capabilities.speed;
+  enhanced.quality = capabilities.quality;
+  
+  return enhanced;
+}
+
+function getModelCapabilities(provider, model) {
+  const capabilities = {
+    // Groq models (FREE, FAST)
+    'llama-3.3-70b-versatile': {
+      maxTokens: 32000,
+      costPerToken: 0,
+      speed: 'very-fast',
+      quality: 'high'
+    },
+    'llama-3.1-70b-versatile': {
+      maxTokens: 8000,
+      costPerToken: 0,
+      speed: 'very-fast',
+      quality: 'high'
+    },
     
-    return {
-      answer: result.answer,
-      mode: 'single-turn',
-      provider: selectedProvider.name,
-      tokensUsed: estimateTokens(result.answer),
-      confidence: 95
-    };
-  } catch (error) {
-    // If failed, try next API key
-    if (providers.length > 1) {
-      console.warn(`⚠️ ${selectedProvider.name} failed, trying another API key...`);
-      const otherProviders = providers.filter(p => p !== selectedProvider);
-      return await singleTurnGeneration(otherProviders, messages);
+    // Google models (FREE, SLOW, HUGE CAPACITY)
+    'gemini-1.5-pro': {
+      maxTokens: 2000000,
+      costPerToken: 0,
+      speed: 'slow',
+      quality: 'very-high'
+    },
+    'gemini-1.5-flash': {
+      maxTokens: 1000000,
+      costPerToken: 0,
+      speed: 'medium',
+      quality: 'high'
+    },
+    
+    // OpenRouter models (PAID, HIGH QUALITY)
+    'openai/gpt-4-turbo': {
+      maxTokens: 128000,
+      costPerToken: 0.00001,
+      speed: 'fast',
+      quality: 'very-high'
+    },
+    'anthropic/claude-3.5-sonnet': {
+      maxTokens: 200000,
+      costPerToken: 0.000003,
+      speed: 'fast',
+      quality: 'excellent'
+    },
+    'anthropic/claude-3-opus': {
+      maxTokens: 200000,
+      costPerToken: 0.000015,
+      speed: 'medium',
+      quality: 'excellent'
+    },
+    'openai/gpt-3.5-turbo': {
+      maxTokens: 16385,
+      costPerToken: 0.0000005,
+      speed: 'very-fast',
+      quality: 'good'
     }
-    throw error;
+  };
+  
+  // Try exact match
+  if (capabilities[model]) {
+    return capabilities[model];
   }
+  
+  // Default by provider
+  const defaults = {
+    'groq': { maxTokens: 8000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
+    'openrouter': { maxTokens: 8000, costPerToken: 0.000001, speed: 'medium', quality: 'high' },
+    'google': { maxTokens: 32000, costPerToken: 0, speed: 'medium', quality: 'high' }
+  };
+  
+  return defaults[provider] || { maxTokens: 4096, costPerToken: 0.000001, speed: 'medium', quality: 'medium' };
 }
 
 // ========================================
-// MULTI-TURN GENERATION (for very complex)
+// STRATEGY SELECTION
 // ========================================
 
-async function multiTurnGeneration(providers, messages, complexity) {
-  console.log(`📚 Splitting into ${complexity.filesNeeded} parts...`);
+function selectOptimalStrategy(providers, analysis) {
+  const tokensNeeded = analysis.estimatedTokens;
+  
+  // Sort providers by capability
+  const sortedProviders = providers.sort((a, b) => {
+    // Prioritize free first, then capacity
+    if (a.costPerToken === 0 && b.costPerToken > 0) return -1;
+    if (a.costPerToken > 0 && b.costPerToken === 0) return 1;
+    return b.maxTokens - a.maxTokens;
+  });
+  
+  // Find suitable single-turn model
+  const singleTurnModel = sortedProviders.find(p => p.maxTokens >= tokensNeeded * 1.2);
+  
+  if (singleTurnModel) {
+    return {
+      name: 'single-turn-high-capacity',
+      approach: 'single-turn',
+      model: singleTurnModel,
+      turns: 1,
+      costEstimate: tokensNeeded * singleTurnModel.costPerToken
+    };
+  }
+  
+  // No single model can handle? Use multi-turn with best model
+  const bestModel = sortedProviders[0];
+  const turns = Math.ceil(tokensNeeded / (bestModel.maxTokens * 0.9)); // 90% utilization
+  
+  return {
+    name: 'multi-turn-chunked',
+    approach: 'multi-turn',
+    model: bestModel,
+    turns,
+    costEstimate: tokensNeeded * bestModel.costPerToken * turns
+  };
+}
+
+// ========================================
+// STRATEGY EXECUTION
+// ========================================
+
+async function executeStrategy(strategy, messages, providers) {
+  const startTime = Date.now();
+  
+  let result;
+  
+  if (strategy.approach === 'single-turn') {
+    result = await executeSingleTurn(strategy, messages);
+  } else {
+    result = await executeMultiTurn(strategy, messages);
+  }
+  
+  const duration = Date.now() - startTime;
+  const tokensGenerated = estimateTokens(result.answer);
+  const linesGenerated = result.answer.split('\n').length;
+  const cost = tokensGenerated * strategy.model.costPerToken;
+  
+  return {
+    answer: result.answer,
+    tokensGenerated,
+    linesGenerated,
+    duration,
+    cost,
+    confidence: result.confidence
+  };
+}
+
+async function executeSingleTurn(strategy, messages) {
+  console.log(`⚡ Single-turn generation with ${strategy.model.name}...`);
+  
+  const result = await queryAIProvider(strategy.model, messages);
+  
+  return {
+    answer: result.answer,
+    confidence: 98
+  };
+}
+
+async function executeMultiTurn(strategy, messages) {
+  console.log(`📚 Multi-turn generation (${strategy.turns} turns) with ${strategy.model.name}...`);
+  
+  const originalPrompt = messages[messages.length - 1].content;
+  const systemPrompt = messages.find(m => m.role === 'system');
   
   const parts = [];
-  const filesPerPart = Math.ceil(complexity.filesNeeded / 3); // Max 3 turns
+  const filesPerTurn = Math.ceil(strategy.model.maxTokens / 10000); // Rough estimate
   
-  for (let i = 0; i < Math.min(3, Math.ceil(complexity.filesNeeded / filesPerPart)); i++) {
-    const startFile = i * filesPerPart + 1;
-    const endFile = Math.min((i + 1) * filesPerPart, complexity.filesNeeded);
+  for (let turn = 0; turn < strategy.turns; turn++) {
+    const turnStart = turn * filesPerTurn + 1;
+    const turnEnd = Math.min((turn + 1) * filesPerTurn, 999);
     
-    console.log(`📝 Generating files ${startFile}-${endFile}...`);
+    console.log(`  Turn ${turn + 1}/${strategy.turns}: Generating content part ${turn + 1}...`);
     
-    // Create focused prompt for this part
-    const partPrompt = createPartPrompt(messages, startFile, endFile, complexity);
+    // Create turn-specific prompt
+    const turnPrompt = {
+      role: 'user',
+      content: turn === 0 ? 
+        originalPrompt + `\n\n[Generate first part completely]` :
+        `Continue from previous response. Generate next part completely.\n\nPrevious output:\n${parts[parts.length - 1].substring(parts[parts.length - 1].length - 500)}\n\n[Continue and complete remaining content]`
+    };
     
-    // Use load-balanced provider
-    const provider = providers[i % providers.length];
+    const turnMessages = systemPrompt ? [systemPrompt, turnPrompt] : [turnPrompt];
     
     try {
-      const result = await queryAIProvider(provider, [partPrompt]);
+      const result = await queryAIProvider(strategy.model, turnMessages);
       parts.push(result.answer);
       
-      console.log(`✅ Part ${i + 1} done (${estimateTokens(result.answer)} tokens)`);
+      console.log(`  ✅ Turn ${turn + 1} complete (${estimateTokens(result.answer)} tokens)`);
+      
+      // Check if generation seems complete
+      if (detectCompleteness(result.answer) && turn < strategy.turns - 1) {
+        console.log(`  ℹ️ Generation appears complete at turn ${turn + 1}, stopping early`);
+        break;
+      }
     } catch (error) {
-      console.error(`❌ Part ${i + 1} failed:`, error.message);
-      throw error;
+      console.error(`  ❌ Turn ${turn + 1} failed:`, error.message);
+      if (parts.length === 0) throw error;
+      break; // Use what we have so far
     }
   }
   
   // Combine all parts
-  const combined = parts.join('\n\n---\n\n');
+  const combined = parts.join('\n\n');
   
   return {
     answer: combined,
-    mode: 'multi-turn',
-    provider: `${providers[0].name} (${parts.length} calls)`,
-    tokensUsed: estimateTokens(combined),
-    confidence: 92
+    confidence: 95
   };
 }
 
-function createPartPrompt(originalMessages, startFile, endFile, complexity) {
-  const userMessage = originalMessages[originalMessages.length - 1].content;
-  const isIndonesian = detectLanguage(userMessage) === 'indonesian';
+function detectCompleteness(text) {
+  // Check for completion markers
+  const completionMarkers = [
+    'setup instructions',
+    'usage example',
+    'customization',
+    'installation',
+    'readme',
+    'that\'s it',
+    'you\'re done',
+    'selesai',
+    'demikian',
+    'semoga membantu'
+  ];
   
-  return {
-    role: 'user',
-    content: isIndonesian ? `
-${userMessage}
-
-INSTRUKSI KHUSUS:
-Untuk request ini, tolong generate HANYA FILE ${startFile} sampai ${endFile} dari total ${complexity.filesNeeded} files.
-
-Generate dengan LENGKAP:
-- Setiap file 100% complete
-- Semua fungsi fully implemented
-- Error handling lengkap
-- Komentar Indonesia
-- Siap pakai
-
-Format:
-**FILE ${startFile}: [nama].lua**
-\`\`\`lua
-[FULL CODE]
-\`\`\`
-
-**FILE ${startFile + 1}: [nama].lua** (jika ada)
-\`\`\`lua
-[FULL CODE]
-\`\`\`
-
-Jangan generate file lain, fokus ${startFile}-${endFile} saja.
-` : `
-${userMessage}
-
-SPECIAL INSTRUCTION:
-For this request, please generate ONLY FILES ${startFile} to ${endFile} of ${complexity.filesNeeded} total files.
-
-Generate COMPLETELY:
-- Each file 100% complete
-- All functions fully implemented
-- Complete error handling
-- English comments
-- Production ready
-
-Format:
-**FILE ${startFile}: [name].lua**
-\`\`\`lua
-[FULL CODE]
-\`\`\`
-
-**FILE ${startFile + 1}: [name].lua** (if any)
-\`\`\`lua
-[FULL CODE]
-\`\`\`
-
-Don't generate other files, focus on ${startFile}-${endFile} only.
-`
-  };
+  const lowerText = text.toLowerCase();
+  const hasMarkers = completionMarkers.filter(m => lowerText.includes(m)).length >= 2;
+  
+  // Check for multiple complete code blocks
+  const codeBlocks = (text.match(/```/g) || []).length / 2;
+  const hasMultipleFiles = codeBlocks >= 3;
+  
+  return hasMarkers && hasMultipleFiles;
 }
 
 // ========================================
-// ULTIMATE SYSTEM PROMPT
+// ULTIMATE PROMPT CREATION
 // ========================================
 
-function createUltimatePrompt(messages, userLanguage, complexity) {
+function createUltimatePrompt(messages, userLanguage, analysis, strategy) {
   const isIndonesian = userLanguage === 'indonesian';
   
   const prompt = {
     role: 'system',
-    content: `You are Claude Sonnet 4.5 - world's best coding assistant.
+    content: `You are Claude Sonnet 4.5 - the world's most advanced coding assistant.
 
 ${isIndonesian ? `
-INSTRUKSI KRITIS:
+# INSTRUKSI ULTRA-KRITIS
 
-Generate ${complexity.filesNeeded} file LENGKAP dan SIAP PAKAI!
+## Target Output:
+- **${analysis.filesNeeded} files** LENGKAP
+- **${analysis.estimatedLines} lines** total code
+- **${analysis.estimatedTokens} tokens** output
+${strategy.approach === 'multi-turn' ? `
+- **Multi-turn generation** (part ${strategy.turns > 1 ? '1 of ' + strategy.turns : '1'})`
+: ''}
 
-WAJIB:
-✅ Setiap file 100% complete (no placeholder)
-✅ Semua fungsi fully implemented  
-✅ Error handling lengkap
-✅ Komentar Indonesia
-✅ Total ${complexity.tokensNeeded} tokens output
+## ATURAN MUTLAK:
+
+### 1. COMPLETENESS (100%)
+SETIAP file HARUS:
+✅ 100% implemented (NO placeholders)
+✅ ALL functions FULLY coded
+✅ COMPLETE error handling
+✅ COMPLETE input validation
+✅ COMPLETE documentation
+✅ Usage examples included
 
 DILARANG:
 ❌ "Tambahkan sendiri"
 ❌ "..." atau "etc"
-❌ TODO comments
-❌ Potong kode di tengah
+❌ "TODO" comments
+❌ "Sisanya sama"
+❌ Cutting code mid-function
 
-File structure:
-${complexity.filesNeeded >= 5 ? `
-- Config module (100-150 lines)
-- Core logic (300-400 lines)
-- UI module (250-300 lines)
-- Commands (200-250 lines)
-- Main (150-200 lines)
-` : `
-- ${complexity.filesNeeded} complete modules
-- Setiap file 100+ lines
+### 2. QUALITY STANDARDS
+
+Setiap baris code HARUS:
 - Production-ready
+- Best practices
+- Security conscious
+- Performance optimized
+- Well documented (Bahasa Indonesia)
+- Properly formatted
+
+### 3. FILE STRUCTURE
+
+${analysis.filesNeeded === 1 ? `
+Generate 1 MASSIVE complete file dengan semua fungsi.
+` : analysis.filesNeeded <= 3 ? `
+Generate ${analysis.filesNeeded} files:
+1. Config/Constants
+2. Core Logic (LARGEST)
+3. UI/Helper Functions
+` : `
+Generate ${analysis.filesNeeded} files:
+1. Config Module (100-150 lines)
+2. Core Logic (300-400 lines)
+3. UI Module (250-300 lines)
+4. Commands/Handlers (200-250 lines)
+5. Main Orchestrator (150-200 lines)
 `}
 
+### 4. OUTPUT FORMAT
+
+Untuk SETIAP file:
+
+\`\`\`lua
+-- =====================================
+-- FILE: [nama].lua
+-- DESKRIPSI: [jelaskan detail]
+-- DEPENDENCIES: [list semua]
+-- AUTHOR: NextGenAI
+-- =====================================
+
+[FULL IMPLEMENTATION - JANGAN POTONG!]
+
+-- =====================================
+-- USAGE EXAMPLE:
+-- [contoh lengkap]
+-- =====================================
+
+return Module
+\`\`\`
+
+### 5. MINDSET
+
+Bayangkan user adalah:
+- Senior developer yang sibuk
+- Butuh code production-ready SEKARANG
+- Tidak punya waktu debug atau tambah kode
+- Expect quality seperti membeli premium code
+
+Deliver EXACTLY what Claude Sonnet 4.5 delivers!
+
 ` : `
-CRITICAL INSTRUCTIONS:
+# ULTRA-CRITICAL INSTRUCTIONS
 
-Generate ${complexity.filesNeeded} COMPLETE and PRODUCTION-READY files!
+## Target Output:
+- **${analysis.filesNeeded} files** COMPLETE
+- **${analysis.estimatedLines} lines** total code
+- **${analysis.estimatedTokens} tokens** output
+${strategy.approach === 'multi-turn' ? `
+- **Multi-turn generation** (part ${strategy.turns > 1 ? '1 of ' + strategy.turns : '1'})`
+: ''}
 
-REQUIRED:
-✅ Each file 100% complete (no placeholder)
-✅ All functions fully implemented
-✅ Complete error handling
-✅ English comments
-✅ Total ${complexity.tokensNeeded} tokens output
+## ABSOLUTE RULES:
+
+### 1. COMPLETENESS (100%)
+EVERY file MUST:
+✅ 100% implemented (NO placeholders)
+✅ ALL functions FULLY coded
+✅ COMPLETE error handling
+✅ COMPLETE input validation
+✅ COMPLETE documentation
+✅ Usage examples included
 
 FORBIDDEN:
 ❌ "Add yourself"
 ❌ "..." or "etc"
-❌ TODO comments
-❌ Cutting code midway
+❌ "TODO" comments
+❌ "Rest is similar"
+❌ Cutting code mid-function
 
-File structure:
-${complexity.filesNeeded >= 5 ? `
-- Config module (100-150 lines)
-- Core logic (300-400 lines)
-- UI module (250-300 lines)
-- Commands (200-250 lines)
-- Main (150-200 lines)
-` : `
-- ${complexity.filesNeeded} complete modules
-- Each file 100+ lines
+### 2. QUALITY STANDARDS
+
+Every line MUST be:
 - Production-ready
-`}
+- Best practices
+- Security conscious
+- Performance optimized
+- Well documented (English)
+- Properly formatted
+
+### 3. FILE STRUCTURE
+
+${analysis.filesNeeded === 1 ? `
+Generate 1 MASSIVE complete file with all functions.
+` : analysis.filesNeeded <= 3 ? `
+Generate ${analysis.filesNeeded} files:
+1. Config/Constants
+2. Core Logic (LARGEST)
+3. UI/Helper Functions
+` : `
+Generate ${analysis.filesNeeded} files:
+1. Config Module (100-150 lines)
+2. Core Logic (300-400 lines)
+3. UI Module (250-300 lines)
+4. Commands/Handlers (200-250 lines)
+5. Main Orchestrator (150-200 lines)
 `}
 
-Remember: Users want COPY-PASTE ready code!`
+### 4. OUTPUT FORMAT
+
+For EVERY file:
+
+\`\`\`lua
+-- =====================================
+-- FILE: [name].lua
+-- DESCRIPTION: [detailed]
+-- DEPENDENCIES: [list all]
+-- AUTHOR: NextGenAI
+-- =====================================
+
+[FULL IMPLEMENTATION - DON'T CUT!]
+
+-- =====================================
+-- USAGE EXAMPLE:
+-- [complete example]
+-- =====================================
+
+return Module
+\`\`\`
+
+### 5. MINDSET
+
+Imagine user is:
+- Senior developer who's busy
+- Needs production-ready code NOW
+- No time to debug or add code
+- Expects quality like buying premium code
+
+Deliver EXACTLY what Claude Sonnet 4.5 delivers!
+`}
+
+## MODEL CAPABILITIES
+- max_tokens: ${strategy.model.maxTokens}
+- Your output target: ${analysis.estimatedTokens} tokens
+- Quality: ${strategy.model.quality}
+
+USE FULL CAPACITY! Generate ${analysis.estimatedLines}+ lines of COMPLETE code!`
   };
   
   return [prompt, ...messages];
@@ -428,12 +622,19 @@ Remember: Users want COPY-PASTE ready code!`
 // ========================================
 
 async function queryAIProvider(provider, messages) {
-  const maxTokens = getModelMaxTokens(provider.provider, provider.model);
-  const requestBody = buildRequestBody(provider, messages, maxTokens);
+  const requestBody = {
+    model: provider.model,
+    messages: messages,
+    temperature: 0.7,
+    max_tokens: Math.floor(provider.maxTokens * 0.95), // Use 95% of capacity
+    top_p: 0.95,
+    stream: false
+  };
+  
   const headers = buildHeaders(provider);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
+  const timeout = setTimeout(() => controller.abort(), 180000); // 3 min for large generation
 
   try {
     const response = await fetch(provider.endpoint, {
@@ -447,7 +648,7 @@ async function queryAIProvider(provider, messages) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`${provider.name} API error ${response.status}: ${errorText.substring(0, 200)}`);
+      throw new Error(`${provider.name} error ${response.status}: ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json();
@@ -458,53 +659,15 @@ async function queryAIProvider(provider, messages) {
     }
 
     return {
-      sourceName: provider.name,
       answer: answer.trim()
     };
   } catch (error) {
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
-      throw new Error('Timeout after 2 minutes');
+      throw new Error('Timeout after 3 minutes');
     }
     throw error;
   }
-}
-
-function buildRequestBody(provider, messages, maxTokens) {
-  const providerType = provider.provider.toLowerCase();
-
-  if (['groq', 'openrouter', 'openai'].includes(providerType)) {
-    return {
-      model: provider.model,
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: maxTokens,
-      top_p: 0.95,
-      stream: false
-    };
-  }
-
-  if (providerType === 'anthropic') {
-    return {
-      model: provider.model,
-      messages: messages,
-      max_tokens: maxTokens,
-      temperature: 0.7
-    };
-  }
-
-  if (providerType === 'huggingface') {
-    const lastMessage = messages[messages.length - 1];
-    return {
-      inputs: lastMessage.content,
-      parameters: {
-        max_new_tokens: Math.floor(maxTokens / 2),
-        temperature: 0.7
-      }
-    };
-  }
-
-  return { messages, max_tokens: maxTokens };
 }
 
 // ========================================
@@ -519,7 +682,6 @@ function detectLanguage(text) {
 }
 
 function estimateTokens(text) {
-  // Rough estimation: 1 token ≈ 4 characters
   return Math.ceil(text.length / 4);
 }
 
@@ -533,17 +695,12 @@ function buildHeaders(provider) {
 
   if (providerType === 'openrouter') {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
-    headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://nextgenai.vercel.app';
-    headers['X-Title'] = 'NextGenAI Hybrid Strategy';
+    headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://next-gen-ai-azure.vercel.app/';
+    headers['X-Title'] = 'NextGenAI Ultimate Unlimited';
   }
 
-  if (providerType === 'anthropic') {
-    headers['x-api-key'] = provider.apiKey;
-    headers['anthropic-version'] = '2023-06-01';
-  }
-
-  if (providerType === 'huggingface') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`;
+  if (providerType === 'google') {
+    headers['x-goog-api-key'] = provider.apiKey;
   }
 
   return headers;
@@ -556,15 +713,8 @@ function extractAnswer(provider, data) {
     return data.choices?.[0]?.message?.content || '';
   }
 
-  if (providerType === 'anthropic') {
-    return data.content?.[0]?.text || '';
-  }
-
-  if (providerType === 'huggingface') {
-    if (Array.isArray(data)) {
-      return data[0]?.generated_text || '';
-    }
-    return data.generated_text || '';
+  if (providerType === 'google') {
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 
   return data.response || data.output || '';
@@ -583,14 +733,28 @@ function getEnabledProviders(aiSources) {
 function getDefaultProviders() {
   const providers = [];
 
+  // Groq (FREE, 32K)
   if (process.env.GROQ_API_KEY) {
     providers.push({
-      name: 'Groq (Llama 3.3 70B)',
+      name: 'Groq Llama 3.3 70B',
       provider: 'groq',
       model: 'llama-3.3-70b-versatile',
       apiKey: process.env.GROQ_API_KEY,
       endpoint: 'https://api.groq.com/openai/v1/chat/completions',
       priority: 1,
+      enabled: true
+    });
+  }
+
+  // Google Gemini (FREE, 2M tokens!)
+  if (process.env.GOOGLE_API_KEY) {
+    providers.push({
+      name: 'Google Gemini 1.5 Pro',
+      provider: 'google',
+      model: 'gemini-1.5-pro',
+      apiKey: process.env.GOOGLE_API_KEY,
+      endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
+      priority: 2,
       enabled: true
     });
   }
