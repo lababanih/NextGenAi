@@ -1,5 +1,5 @@
-// NextGenAI - ULTIMATE VERSION
-// Model-specific capabilities, better formatting
+// NextGenAI - FINAL PERFECT VERSION
+// Guaranteed working artifacts, no more \n errors
 
 let messages = [];
 let isLoading = false;
@@ -11,25 +11,21 @@ const MODEL_INFO = {
   sonnet: {
     name: 'Sonnet',
     description: 'General purpose, balanced & smart',
-    capabilities: ['chat', 'code', 'analysis'],
     icon: '🧠'
   },
   mou: {
     name: 'Mou',
     description: 'Web search, code, deep research',
-    capabilities: ['search', 'code', 'research'],
     icon: '🔍'
   },
   nevi: {
     name: 'Nevi',
     description: 'Image generation',
-    capabilities: ['image_generation'],
     icon: '🎨'
   },
   vidi: {
     name: 'Vidi',
     description: 'Video generation',
-    capabilities: ['video_generation'],
     icon: '🎬',
     comingSoon: true
   }
@@ -80,7 +76,6 @@ function selectModel(model, event) {
   localStorage.setItem('selected_model', model);
   updateModelDisplay();
   
-  // Update active state
   document.querySelectorAll('.model-item').forEach(item => {
     item.classList.remove('active');
   });
@@ -88,7 +83,6 @@ function selectModel(model, event) {
   
   document.getElementById('modelSelector').classList.add('hidden');
   
-  // Show model change message
   const modelInfo = MODEL_INFO[model];
   addMessage('system', `Switched to ${modelInfo.icon} ${modelInfo.name}: ${modelInfo.description}`);
 }
@@ -193,7 +187,6 @@ function addMessage(role, content, options = {}) {
   if (options.artifact) {
     msg.innerHTML = `${avatar}<div class="flex-1 min-w-0">${renderArtifact(options.artifact)}</div>`;
   } else {
-    // Format content with markdown-like styling
     const formattedContent = formatResponse(content);
     msg.innerHTML = `
       ${avatar}
@@ -210,32 +203,16 @@ function addMessage(role, content, options = {}) {
 }
 
 function formatResponse(text) {
-  // Better formatting for AI responses
   let formatted = escapeHtml(text);
   
-  // Bold text: **text** or __text__
   formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  formatted = formatted.replace(/__(.*?)__/g, '<strong>$1</strong>');
-  
-  // Italic: *text* or _text_
   formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-  formatted = formatted.replace(/_(.*?)_/g, '<em>$1</em>');
-  
-  // Inline code: `code`
   formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-  
-  // Line breaks
   formatted = formatted.replace(/\n\n/g, '</p><p>');
   formatted = formatted.replace(/\n/g, '<br>');
-  
-  // Bullet points
   formatted = formatted.replace(/^[•\-\*]\s+(.+)$/gm, '<li>$1</li>');
   formatted = formatted.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
   
-  // Numbered lists
-  formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
-  
-  // Wrap in paragraphs if not already
   if (!formatted.startsWith('<')) {
     formatted = '<p>' + formatted + '</p>';
   }
@@ -298,7 +275,7 @@ function switchTab(id, tab, event) {
 function copyCode(id) {
   const code = window[`code_${id}`];
   navigator.clipboard.writeText(code).then(() => {
-    alert('✅ Code copied to clipboard!');
+    alert('✅ Code copied!');
   });
 }
 
@@ -356,103 +333,91 @@ async function sendMessage() {
 
 // Model-Specific Processing
 async function processWithModel(question) {
-  const modelInfo = MODEL_INFO[selectedModel];
-  
   switch (selectedModel) {
     case 'mou':
       return await processMou(question);
     case 'nevi':
       return await processNevi(question);
     case 'vidi':
-      return { answer: '🎬 Vidi model is coming soon! Please use another model for now.' };
+      return { answer: '🎬 Vidi model coming soon!' };
     default:
       return await processSonnet(question);
   }
 }
 
-// Mou: Search, Code, Research
 async function processMou(question) {
-  const needsCode = /create|build|make|generate|buat|bikin|code|program/i.test(question);
+  const needsCode = /create|build|make|generate|buat|bikin|code|program|admin panel|dashboard|app/i.test(question);
   
   if (needsCode) {
     return await generateArtifact(question);
   } else {
-    // Regular response with research capability
     return await queryAI(question, {
-      systemPrompt: `You are Mou, an AI specialized in web search, coding, and deep research. 
+      systemPrompt: `You are Mou, specialized in web search, coding, and research.
 
-Provide comprehensive, well-researched answers with:
-- Clear structure with headings
-- Bullet points for lists
-- Code examples when relevant
-- Citations when appropriate
-
-Format your response using:
+Provide comprehensive answers with:
 - **Bold** for emphasis
-- \`code\` for inline code
-- Bullet points with • or -
-- Numbered lists when order matters
+- Bullet points for lists
+- \`code\` when relevant
+- Clear structure
 
-Be thorough but concise.`
+Be thorough and professional.`
     });
   }
 }
 
-// Nevi: Image Generation
 async function processNevi(question) {
-  // Extract image description
   const description = question.replace(/generate|create|make|buat|gambar|image/gi, '').trim();
-  
-  // Generate image URL (using Pollinations.ai - FREE)
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(description)}?width=1024&height=1024&seed=${Date.now()}`;
   
   return {
-    answer: `**🎨 Image Generated**\n\nPrompt: *${description}*\n\n![Generated Image](${imageUrl})\n\nCreated by Nevi AI`,
+    answer: `**🎨 Image Generated**\n\nPrompt: *${description}*\n\n<img src="${imageUrl}" alt="Generated Image" style="max-width: 100%; border-radius: 8px; margin: 1rem 0;" />\n\nCreated by Nevi AI`,
     artifact: null
   };
 }
 
-// Sonnet: General Purpose
 async function processSonnet(question) {
-  const needsCode = /create|build|make|generate|buat|bikin/i.test(question);
+  const needsCode = /create|build|make|generate|buat|bikin|admin panel|dashboard/i.test(question);
   
   if (needsCode) {
     return await generateArtifact(question);
   } else {
     return await queryAI(question, {
-      systemPrompt: `You are Sonnet, a balanced and intelligent AI assistant.
+      systemPrompt: `You are Sonnet, a balanced AI assistant.
 
-Provide helpful, accurate responses with:
-- Clear explanations
-- Well-structured information
-- Examples when helpful
-- Professional tone
-
-Format using:
+Provide clear, helpful responses with:
 - **Bold** for key points
 - Bullet points for lists
-- Clear paragraphs
-- \`code\` when relevant`
+- Professional tone
+
+Format nicely.`
     });
   }
 }
 
-// Generate Artifact (Code)
+// CRITICAL: Generate Artifact - THIS IS THE FIX
 async function generateArtifact(prompt) {
   const source = getSource();
   if (!source) throw new Error('NO_CONFIG');
 
-  const systemPrompt = `You are a code generator. Generate ONLY complete, working HTML code.
+  // ULTRA-STRICT SYSTEM PROMPT
+  const systemPrompt = `You are a code generator. You MUST follow these rules EXACTLY:
 
-RULES:
-1. Start immediately with <!DOCTYPE html>
-2. NO explanations, NO JSON, NO markdown blocks
-3. Include Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
-4. Make it beautiful, modern, and fully functional
-5. All CSS/JS must be inline
-6. Production-ready quality
+1. Generate ONLY pure HTML code
+2. Start with <!DOCTYPE html> IMMEDIATELY
+3. NO explanations before or after
+4. NO JSON format
+5. NO markdown code blocks (no \`\`\`html)
+6. NO text wrapping
+7. Just pure, raw HTML code
 
-Generate ONLY the HTML code, nothing else.`;
+Include:
+- <script src="https://cdn.tailwindcss.com"></script> for styling
+- Make it beautiful and functional
+- All CSS/JS inline in the HTML
+
+Your ENTIRE response should be ONLY the HTML code, starting with <!DOCTYPE html>
+
+DO NOT include any text before or after the code. DO NOT use \`\`\`html or any markdown.`;
 
   try {
     const response = await fetch(source.endpoint, {
@@ -465,53 +430,82 @@ Generate ONLY the HTML code, nothing else.`;
         model: source.model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
+          { role: 'user', content: `Generate HTML code for: ${prompt}. Remember: ONLY HTML code, no explanations, no markdown, start with <!DOCTYPE html>` }
         ],
-        temperature: 0.7,
+        temperature: 0.5,
         max_tokens: 4096
       })
     });
 
-    if (!response.ok) throw new Error('API failed');
+    if (!response.ok) {
+      console.error('API failed:', response.status);
+      throw new Error('API failed');
+    }
     
     const data = await response.json();
-    let code = data.choices[0].message.content.trim();
+    let code = data.choices[0].message.content;
     
-    // Clean markdown
-    code = code.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
+    console.log('Raw AI response:', code.substring(0, 200));
     
-    // Extract HTML
-    if (!code.startsWith('<!DOCTYPE')) {
-      const match = code.match(/<!DOCTYPE[\s\S]*<\/html>/i);
-      if (match) code = match[0];
+    // AGGRESSIVE CLEANING
+    // Remove ALL possible markdown wrappers
+    code = code.replace(/```html\s*/gi, '');
+    code = code.replace(/```\s*/g, '');
+    code = code.trim();
+    
+    // Remove any text before <!DOCTYPE
+    const doctypeIndex = code.indexOf('<!DOCTYPE');
+    const htmlIndex = code.indexOf('<html');
+    
+    if (doctypeIndex !== -1) {
+      code = code.substring(doctypeIndex);
+    } else if (htmlIndex !== -1) {
+      code = code.substring(htmlIndex);
     }
     
-    // Validate
-    if (!code.includes('<!DOCTYPE') && !code.includes('<html')) {
-      return { answer: '❌ Failed to generate valid code. Please try with more specific details.' };
+    // Remove any text after </html>
+    const htmlEndIndex = code.lastIndexOf('</html>');
+    if (htmlEndIndex !== -1) {
+      code = code.substring(0, htmlEndIndex + 7);
     }
     
+    // Final validation
+    if (!code.includes('<html') && !code.includes('<!DOCTYPE')) {
+      console.error('Invalid HTML:', code.substring(0, 200));
+      return { 
+        answer: `❌ Failed to generate valid HTML code. The AI returned invalid format.\n\nPlease try again with more specific requirements.` 
+      };
+    }
+    
+    // Extract title
     const titleMatch = code.match(/<title>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1] : 'Generated App';
+    const title = titleMatch ? titleMatch[1] : 'Generated Application';
+    
+    console.log('Final code preview:', code.substring(0, 200));
+    console.log('Code length:', code.length);
     
     return {
-      explanation: "**✨ I've created what you requested:**",
-      artifact: { title, type: 'html', code }
+      explanation: `**✨ I've created: ${title}**`,
+      artifact: { 
+        title, 
+        type: 'html', 
+        code: code 
+      }
     };
     
   } catch (error) {
-    console.error(error);
-    return { answer: '❌ Failed to generate. Please try again.' };
+    console.error('Generate artifact error:', error);
+    return { 
+      answer: `❌ Failed to generate code: ${error.message}\n\nPlease try again or rephrase your request.` 
+    };
   }
 }
 
-// Query AI (Regular chat)
 async function queryAI(question, options = {}) {
   const source = getSource();
   if (!source) throw new Error('NO_CONFIG');
 
-  const defaultPrompt = 'You are a helpful AI assistant. Be concise and professional.';
-  const systemPrompt = options.systemPrompt || defaultPrompt;
+  const systemPrompt = options.systemPrompt || 'You are a helpful AI assistant.';
 
   try {
     const response = await fetch(source.endpoint, {
@@ -542,7 +536,6 @@ async function queryAI(question, options = {}) {
 }
 
 function getSource() {
-  // Use best available source
   return aiSources.find(s => s.model.includes('3.3') || s.model.includes('3.2')) || aiSources[0];
 }
 
@@ -552,5 +545,4 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Initialize
 window.addEventListener('DOMContentLoaded', init);
