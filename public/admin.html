@@ -1,578 +1,178 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Panel - AI Configuration</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
+// ==================================================
+// ADD THIS CODE TO THE TOP OF admin.html <script>
+// ==================================================
+
+// Check authentication before loading admin panel
+(async function checkAuth() {
+  const token = localStorage.getItem('admin_token');
   
-  <!-- Login Screen -->
-  <div id="loginScreen" class="flex items-center justify-center min-h-screen p-6">
-    <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
-      <div class="text-center mb-6">
-        <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-4xl">🔐</span>
+  if (!token) {
+    // No token, redirect to login
+    window.location.href = '/login.html';
+    return;
+  }
+
+  try {
+    // Verify token with backend
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ action: 'verify' })
+    });
+
+    const data = await response.json();
+
+    if (!data.valid) {
+      // Token invalid, clear and redirect
+      localStorage.clear();
+      window.location.href = '/login.html';
+      return;
+    }
+
+    // Show admin info
+    console.log('✅ Authenticated as:', data.email);
+    
+    // Display admin name in UI (optional)
+    const adminName = localStorage.getItem('admin_name') || data.name;
+    displayAdminInfo(adminName, data.email);
+
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+})();
+
+// Display admin info in header
+function displayAdminInfo(name, email) {
+  // Add this HTML somewhere in your admin panel header:
+  const headerHTML = `
+    <div style="position: fixed; top: 10px; right: 10px; background: white; padding: 10px 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 9999;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="text-align: right;">
+          <div style="font-weight: 600; color: #333;">${name}</div>
+          <div style="font-size: 12px; color: #666;">${email}</div>
         </div>
-        <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
-        <p class="text-gray-600 text-sm">Masukkan password admin</p>
-      </div>
-      
-      <input
-        type="password"
-        id="adminPassword"
-        placeholder="Admin Password"
-        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
-        onkeypress="if(event.key==='Enter') checkPassword()"
-      />
-      
-      <button
-        onclick="checkPassword()"
-        class="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 font-medium"
-      >
-        Login
-      </button>
-      
-      <div class="mt-4 text-xs text-gray-500 text-center">
-        Default password: <code class="bg-gray-100 px-2 py-1 rounded">admin123</code><br>
-        Ubah password di localStorage atau kode
+        <button onclick="logout()" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 12px;">
+          Logout
+        </button>
       </div>
     </div>
-  </div>
+  `;
+  
+  // Insert at top of body
+  document.body.insertAdjacentHTML('afterbegin', headerHTML);
+}
 
-  <!-- Admin Panel -->
-  <div id="adminPanel" class="hidden p-6">
-    <div class="max-w-6xl mx-auto">
-      
-      <!-- Header -->
-      <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <span class="text-2xl">⚙️</span>
-            </div>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
-              <p class="text-sm text-gray-500">Configure AI Learning Sources</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button onclick="saveAllConfig()" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-              💾 Save All
-            </button>
-            <button onclick="window.location.href='/'" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
-              🏠 Home
-            </button>
-            <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
-              🚪 Logout
-            </button>
-          </div>
-        </div>
+// Logout function
+function logout() {
+  if (confirm('Are you sure you want to logout?')) {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+}
 
-        <!-- Stats -->
-        <div class="grid grid-cols-4 gap-4 mt-6">
-          <div class="bg-blue-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-blue-600" id="totalSources">0</div>
-            <div class="text-sm text-gray-600">Total AI Sources</div>
-          </div>
-          <div class="bg-green-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-green-600" id="activeSources">0</div>
-            <div class="text-sm text-gray-600">Active & Ready</div>
-          </div>
-          <div class="bg-amber-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-amber-600" id="pendingSources">0</div>
-            <div class="text-sm text-gray-600">Need API Key</div>
-          </div>
-          <div class="bg-purple-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-purple-600" id="providers">0</div>
-            <div class="text-sm text-gray-600">Providers</div>
-          </div>
-        </div>
-      </div>
+// ==================================================
+// UPDATE FETCH REQUESTS - Add Authorization Header
+// ==================================================
 
-      <!-- Info Banner -->
-      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
-        <div class="flex items-start gap-3">
-          <span class="text-2xl">💡</span>
-          <div class="text-sm text-blue-800">
-            <strong>Cara Kerja:</strong> AI Anda akan belajar dari semua AI sources yang aktif di bawah ini. 
-            Minimal butuh 1 API key (Groq recommended - gratis!). Makin banyak AI sources, makin pintar hasil pembelajaran!
-          </div>
-        </div>
-      </div>
+// Original fetch code in admin.html:
+// fetch('/api/admin/sources', { method: 'GET' })
 
-      <!-- AI Sources Configuration -->
-      <div id="sourcesList" class="space-y-4">
-        <!-- Will be populated by JS -->
-      </div>
+// Change ALL admin API calls to include token:
+const adminFetch = async (url, options = {}) => {
+  const token = localStorage.getItem('admin_token');
+  
+  if (!token) {
+    window.location.href = '/login.html';
+    return;
+  }
 
-      <!-- Add Custom Source -->
-      <button onclick="showAddForm()" class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-gray-600 hover:text-blue-600 font-medium">
-        ➕ Add Custom AI Source
-      </button>
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
 
-      <!-- Add Form Modal -->
-      <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
-        <div class="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <h2 class="text-xl font-bold mb-4">Add Custom AI Source</h2>
-          
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium mb-2">Source Name</label>
-              <input type="text" id="customName" placeholder="My Custom AI" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">Provider Type</label>
-              <select id="customProvider" class="w-full px-3 py-2 border rounded-lg">
-                <option value="openai">OpenAI Compatible</option>
-                <option value="anthropic">Anthropic (Claude)</option>
-                <option value="custom">Custom API</option>
-              </select>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">API Endpoint</label>
-              <input type="text" id="customEndpoint" placeholder="https://api.example.com/v1/chat/completions" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">Model Name</label>
-              <input type="text" id="customModel" placeholder="gpt-4" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">API Key</label>
-              <input type="password" id="customApiKey" placeholder="sk-..." class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">Priority (1-10, lower = higher)</label>
-              <input type="number" id="customPriority" value="5" min="1" max="10" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-          </div>
-          
-          <div class="flex gap-2 mt-6">
-            <button onclick="closeAddForm()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">
-              Cancel
-            </button>
-            <button onclick="addCustomSource()" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-              Add Source
-            </button>
-          </div>
-        </div>
-      </div>
+  try {
+    const response = await fetch(url, { ...options, headers });
+    
+    if (response.status === 401) {
+      // Token expired or invalid
+      localStorage.clear();
+      window.location.href = '/login.html';
+      return;
+    }
 
-      <!-- Instructions -->
-      <div class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6 mt-6">
-        <h3 class="text-lg font-bold text-purple-900 mb-3">📚 Cara Mendapatkan API Keys (Semua Gratis!)</h3>
-        <div class="space-y-3 text-sm text-purple-800">
-          <div>
-            <strong>1. Groq (Recommended):</strong>
-            <ul class="list-disc ml-5 mt-1">
-              <li>Buka: <a href="https://console.groq.com/" target="_blank" class="underline">console.groq.com</a></li>
-              <li>Login dengan Google → API Keys → Create API Key</li>
-              <li>Gratis unlimited! Model terbaru & tercepat</li>
-            </ul>
-          </div>
-          
-          <div>
-            <strong>2. OpenRouter (Multi-Model):</strong>
-            <ul class="list-disc ml-5 mt-1">
-              <li>Buka: <a href="https://openrouter.ai/" target="_blank" class="underline">openrouter.ai</a></li>
-              <li>Login → Keys → Create Key</li>
-              <li>Akses ke GPT-4, Claude, Gemini, dll dalam 1 API!</li>
-            </ul>
-          </div>
-          
-          <div>
-            <strong>3. HuggingFace (Open Source):</strong>
-            <ul class="list-disc ml-5 mt-1">
-              <li>Buka: <a href="https://huggingface.co/settings/tokens" target="_blank" class="underline">huggingface.co/settings/tokens</a></li>
-              <li>Create token → Role: Read</li>
-              <li>Gratis, banyak model open source</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+    return response;
+  } catch (error) {
+    console.error('Admin API error:', error);
+    throw error;
+  }
+};
 
-    </div>
+// ==================================================
+// EXAMPLE USAGE IN admin.html
+// ==================================================
+
+// Before (old code):
+// fetch('/api/admin/sources', { method: 'GET' })
+//   .then(r => r.json())
+//   .then(data => console.log(data));
+
+// After (new code with auth):
+adminFetch('/api/admin/sources', { method: 'GET' })
+  .then(r => r.json())
+  .then(data => console.log(data));
+
+// For POST requests:
+adminFetch('/api/admin/sources', {
+  method: 'POST',
+  body: JSON.stringify({ sources: updatedSources })
+})
+  .then(r => r.json())
+  .then(data => console.log(data));
+
+// ==================================================
+// COMPLETE ADMIN.HTML TEMPLATE WITH AUTH
+// ==================================================
+
+/*
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel - NextGenAI</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 50px auto 0; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { color: #333; margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛠️ Admin Panel</h1>
+    <div id="content">Loading...</div>
   </div>
 
   <script>
-    // Configuration
-    const ADMIN_PASSWORD = localStorage.getItem('admin_password') || 'admin123';
-    
-    // Default AI sources
-    const defaultSources = [
-      {
-        id: 'groq-llama-3.3',
-        name: 'Groq (Llama 3.3 70B)',
-        provider: 'groq',
-        model: 'llama-3.3-70b-versatile',
-        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-        apiKey: '',
-        priority: 1,
-        enabled: true,
-        isDefault: true,
-        description: '✨ Terbaru! Super cepat, gratis unlimited. RECOMMENDED!'
-      },
-      {
-        id: 'groq-llama-3.1',
-        name: 'Groq (Llama 3.1 70B)',
-        provider: 'groq',
-        model: 'llama-3.1-70b-versatile',
-        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-        apiKey: '',
-        priority: 2,
-        enabled: true,
-        isDefault: true,
-        description: 'Backup stabil, gratis unlimited'
-      },
-      {
-        id: 'openrouter-gpt',
-        name: 'OpenRouter (GPT-3.5 Turbo)',
-        provider: 'openrouter',
-        model: 'openai/gpt-3.5-turbo',
-        endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-        apiKey: '',
-        priority: 3,
-        enabled: false,
-        isDefault: true,
-        description: 'Free tier available, quality bagus'
-      },
-      {
-        id: 'openrouter-claude',
-        name: 'OpenRouter (Claude 3 Haiku)',
-        provider: 'openrouter',
-        model: 'anthropic/claude-3-haiku',
-        endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-        apiKey: '',
-        priority: 4,
-        enabled: false,
-        isDefault: true,
-        description: 'Excellent reasoning, free tier'
-      },
-      {
-        id: 'huggingface-mistral',
-        name: 'HuggingFace (Mistral 7B)',
-        provider: 'huggingface',
-        model: 'mistralai/Mistral-7B-Instruct-v0.2',
-        endpoint: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
-        apiKey: '',
-        priority: 5,
-        enabled: false,
-        isDefault: true,
-        description: 'Open source, gratis'
-      }
-    ];
+    // 1. ADD AUTH CHECK CODE HERE (from above)
+    (async function checkAuth() { ... })();
 
-    let sources = [];
+    // 2. ADD ADMIN FETCH FUNCTION (from above)
+    const adminFetch = async (url, options = {}) => { ... };
 
-    // Load sources from localStorage
-    function loadSources() {
-      const saved = localStorage.getItem('ai_sources');
-      if (saved) {
-        sources = JSON.parse(saved);
-      } else {
-        sources = [...defaultSources];
-      }
-      renderSources();
-      updateStats();
+    // 3. YOUR EXISTING ADMIN CODE
+    async function loadAdminData() {
+      const response = await adminFetch('/api/admin/sources');
+      const data = await response.json();
+      console.log('Admin data:', data);
     }
 
-    // Save sources to localStorage
-    function saveSources() {
-      localStorage.setItem('ai_sources', JSON.stringify(sources));
-    }
-
-    // Render sources
-    function renderSources() {
-      const container = document.getElementById('sourcesList');
-      container.innerHTML = sources.map(source => {
-        const hasApiKey = source.apiKey && source.apiKey.length > 0;
-        const isActive = hasApiKey && source.enabled;
-        
-        return `
-          <div class="bg-white rounded-xl shadow-md p-6 ${!source.enabled || !hasApiKey ? 'opacity-75' : ''}">
-            <div class="flex items-start justify-between gap-4">
-              
-              <!-- Left: Toggle & Info -->
-              <div class="flex items-start gap-4 flex-1">
-                <!-- Toggle -->
-                <label class="relative inline-flex items-center cursor-pointer mt-1">
-                  <input type="checkbox" ${source.enabled ? 'checked' : ''} 
-                         onchange="toggleSource('${source.id}')" 
-                         ${!hasApiKey ? 'disabled' : ''}
-                         class="sr-only peer">
-                  <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${!hasApiKey ? 'opacity-50 cursor-not-allowed' : ''}"></div>
-                </label>
-
-                <!-- Info -->
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-2">
-                    <h3 class="text-lg font-bold text-gray-800">${source.name}</h3>
-                    ${isActive ? '<span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✓ Active</span>' : ''}
-                    ${!hasApiKey ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">⚠ Need API Key</span>' : ''}
-                  </div>
-                  
-                  <p class="text-sm text-gray-600 mb-3">${source.description || ''}</p>
-                  
-                  <div class="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
-                    <span>🏷️ ${source.provider}</span>
-                    <span>🧠 ${source.model}</span>
-                    <span>⚡ Priority: ${source.priority}</span>
-                  </div>
-
-                  <!-- API Key Input -->
-                  <div class="flex gap-2">
-                    <input
-                      type="password"
-                      id="apikey-${source.id}"
-                      value="${source.apiKey || ''}"
-                      placeholder="${getApiKeyPlaceholder(source.provider)}"
-                      onchange="updateApiKey('${source.id}', this.value)"
-                      class="flex-1 px-3 py-2 text-sm border ${hasApiKey ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'} rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button onclick="toggleShowApiKey('${source.id}')" class="px-3 py-2 border rounded-lg hover:bg-gray-50">
-                      👁️
-                    </button>
-                    ${hasApiKey ? `<button onclick="testSource('${source.id}')" class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">Test</button>` : ''}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Right: Actions -->
-              <div class="flex flex-col gap-2">
-                ${!source.isDefault ? `
-                  <button onclick="deleteSource('${source.id}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
-                    🗑️
-                  </button>
-                ` : ''}
-                <button onclick="changePriority('${source.id}')" class="p-2 text-gray-600 hover:bg-gray-50 rounded-lg" title="Change Priority">
-                  🔢
-                </button>
-              </div>
-              
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // Get API key placeholder
-    function getApiKeyPlaceholder(provider) {
-      const placeholders = {
-        'groq': 'gsk_...',
-        'openrouter': 'sk-or-...',
-        'huggingface': 'hf_...',
-        'openai': 'sk-...',
-        'anthropic': 'sk-ant-...'
-      };
-      return placeholders[provider] || 'API Key...';
-    }
-
-    // Update stats
-    function updateStats() {
-      const active = sources.filter(s => s.enabled && s.apiKey).length;
-      const pending = sources.filter(s => !s.apiKey).length;
-      
-      document.getElementById('totalSources').textContent = sources.length;
-      document.getElementById('activeSources').textContent = active;
-      document.getElementById('pendingSources').textContent = pending;
-      document.getElementById('providers').textContent = new Set(sources.map(s => s.provider)).size;
-    }
-
-    // Toggle source
-    function toggleSource(id) {
-      const source = sources.find(s => s.id === id);
-      if (source) {
-        source.enabled = !source.enabled;
-        renderSources();
-        updateStats();
-      }
-    }
-
-    // Update API key
-    function updateApiKey(id, key) {
-      const source = sources.find(s => s.id === id);
-      if (source) {
-        source.apiKey = key.trim();
-        renderSources();
-        updateStats();
-      }
-    }
-
-    // Toggle show API key
-    function toggleShowApiKey(id) {
-      const input = document.getElementById(`apikey-${id}`);
-      input.type = input.type === 'password' ? 'text' : 'password';
-    }
-
-    // Test source
-    async function testSource(id) {
-      const source = sources.find(s => s.id === id);
-      if (!source || !source.apiKey) return;
-
-      const originalText = event.target.textContent;
-      event.target.textContent = '⏳';
-      event.target.disabled = true;
-
-      try {
-        // Build request
-        const headers = {
-          'Content-Type': 'application/json'
-        };
-
-        if (source.provider === 'groq' || source.provider === 'openai') {
-          headers['Authorization'] = `Bearer ${source.apiKey}`;
-        } else if (source.provider === 'openrouter') {
-          headers['Authorization'] = `Bearer ${source.apiKey}`;
-          headers['HTTP-Referer'] = window.location.origin;
-        } else if (source.provider === 'huggingface') {
-          headers['Authorization'] = `Bearer ${source.apiKey}`;
-        }
-
-        const body = source.provider === 'huggingface' ? {
-          inputs: 'Say hello in one word',
-          parameters: { max_new_tokens: 10 }
-        } : {
-          model: source.model,
-          messages: [{ role: 'user', content: 'Say hello in one word' }],
-          max_tokens: 10
-        };
-
-        const response = await fetch(source.endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body)
-        });
-
-        if (response.ok) {
-          alert(`✅ Test Berhasil!\n\n${source.name} berfungsi dengan baik.`);
-        } else {
-          const error = await response.text();
-          alert(`❌ Test Gagal!\n\nStatus: ${response.status}\nError: ${error.substring(0, 200)}`);
-        }
-      } catch (error) {
-        alert(`❌ Test Gagal!\n\nError: ${error.message}`);
-      } finally {
-        event.target.textContent = originalText;
-        event.target.disabled = false;
-      }
-    }
-
-    // Change priority
-    function changePriority(id) {
-      const source = sources.find(s => s.id === id);
-      if (!source) return;
-
-      const newPriority = prompt(`Priority untuk ${source.name} (1-10, lower = higher):`, source.priority);
-      if (newPriority !== null) {
-        const p = parseInt(newPriority);
-        if (p >= 1 && p <= 10) {
-          source.priority = p;
-          sources.sort((a, b) => a.priority - b.priority);
-          renderSources();
-        }
-      }
-    }
-
-    // Delete source
-    function deleteSource(id) {
-      if (confirm('Hapus AI source ini?')) {
-        sources = sources.filter(s => s.id !== id);
-        renderSources();
-        updateStats();
-      }
-    }
-
-    // Show add form
-    function showAddForm() {
-      document.getElementById('addModal').classList.remove('hidden');
-    }
-
-    // Close add form
-    function closeAddForm() {
-      document.getElementById('addModal').classList.add('hidden');
-    }
-
-    // Add custom source
-    function addCustomSource() {
-      const name = document.getElementById('customName').value.trim();
-      const provider = document.getElementById('customProvider').value;
-      const endpoint = document.getElementById('customEndpoint').value.trim();
-      const model = document.getElementById('customModel').value.trim();
-      const apiKey = document.getElementById('customApiKey').value.trim();
-      const priority = parseInt(document.getElementById('customPriority').value);
-
-      if (!name || !endpoint || !model) {
-        alert('Name, endpoint, dan model wajib diisi!');
-        return;
-      }
-
-      const newSource = {
-        id: 'custom-' + Date.now(),
-        name,
-        provider,
-        model,
-        endpoint,
-        apiKey,
-        priority,
-        enabled: true,
-        isDefault: false,
-        description: 'Custom AI source'
-      };
-
-      sources.push(newSource);
-      sources.sort((a, b) => a.priority - b.priority);
-      
-      renderSources();
-      updateStats();
-      closeAddForm();
-
-      // Clear form
-      document.getElementById('customName').value = '';
-      document.getElementById('customEndpoint').value = '';
-      document.getElementById('customModel').value = '';
-      document.getElementById('customApiKey').value = '';
-    }
-
-    // Save all configuration
-    function saveAllConfig() {
-      saveSources();
-      alert('✅ Konfigurasi berhasil disimpan!\n\nAPI keys tersimpan di browser (localStorage).\nUser sekarang bisa langsung pakai AI tanpa setup!');
-    }
-
-    // Login
-    function checkPassword() {
-      const input = document.getElementById('adminPassword').value;
-      if (input === ADMIN_PASSWORD) {
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('adminPanel').classList.remove('hidden');
-        loadSources();
-      } else {
-        alert('❌ Password salah!');
-      }
-    }
-
-    // Logout
-    function logout() {
-      if (confirm('Logout dari admin panel?')) {
-        document.getElementById('adminPanel').classList.add('hidden');
-        document.getElementById('loginScreen').classList.remove('hidden');
-        document.getElementById('adminPassword').value = '';
-      }
-    }
-
-    // Auto-save on change
-    setInterval(() => {
-      if (!document.getElementById('adminPanel').classList.contains('hidden')) {
-        saveSources();
-      }
-    }, 30000); // Save every 30 seconds
+    loadAdminData();
   </script>
-
 </body>
 </html>
+*/
