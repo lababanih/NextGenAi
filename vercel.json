@@ -12,8 +12,16 @@
   ],
   "routes": [
     {
+      "src": "/api/auth/login",
+      "dest": "/api/auth/login.js"
+    },
+    {
       "src": "/api/chat",
       "dest": "/api/chat.js"
+    },
+    {
+      "src": "/api/learn",
+      "dest": "/api/learn/index.js"
     },
     {
       "src": "/api/tools",
@@ -30,6 +38,10 @@
     {
       "src": "/app.js",
       "dest": "/public/app.js"
+    },
+    {
+      "src": "/login",
+      "dest": "/public/login.html"
     },
     {
       "src": "/(.*)",
