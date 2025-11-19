@@ -24,9 +24,8 @@ export default async function handler(req, res) {
     }
 
     const token = authHeader.split(' ')[1];
-    const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key';
     
-    // Simple token verification (skip jwt library if not available)
+    // Simple token verification
     if (!token || token.length < 10) {
       return res.status(401).json({ 
         success: false,
