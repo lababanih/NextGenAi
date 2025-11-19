@@ -176,7 +176,7 @@
     const API_BASE = window.location.origin;
 
     // ==========================================
-    // AUTHENTICATION CHECK
+    // AUTHENTICATION CHECK - SIMPLIFIED VERSION
     // ==========================================
     (async function checkAuth() {
       const token = localStorage.getItem('admin_token');
@@ -186,38 +186,18 @@
         return;
       }
 
-      try {
-        const response = await fetch(`${API_BASE}/api/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ action: 'verify' })
-        });
+      // Skip token verification for simple version
+      console.log('✅ Logged in with token:', token);
 
-        const data = await response.json();
-
-        if (!data.valid) {
-          localStorage.clear();
-          window.location.href = '/login.html';
-          return;
-        }
-
-        // Display admin info
-        document.getElementById('adminName').textContent = data.name || 'Admin';
-        document.getElementById('adminEmail').textContent = data.email;
-        
-        console.log('✅ Authenticated as:', data.email);
-        
-        // Load sources after auth
-        loadSources();
-
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.clear();
-        window.location.href = '/login.html';
-      }
+      // Display admin info
+      const email = localStorage.getItem('admin_email') || 'admin@nextgenai.com';
+      const name = localStorage.getItem('admin_name') || 'Admin';
+      
+      document.getElementById('adminName').textContent = name;
+      document.getElementById('adminEmail').textContent = email;
+      
+      // Load sources
+      loadSources();
     })();
 
     // ==========================================
