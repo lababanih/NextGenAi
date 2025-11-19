@@ -74,13 +74,18 @@
         </div>
       </div>
 
-      <!-- Environment Status -->
+        <!-- Environment Status -->
       <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-bold text-gray-800">🔧 Environment Configuration</h2>
-          <button onclick="loadEnvStatus()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
-            🔄 Refresh
-          </button>
+          <div class="flex gap-2">
+            <button onclick="copyEnvTemplate()" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm">
+              📋 Copy .env Template
+            </button>
+            <button onclick="loadEnvStatus()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
+              🔄 Refresh
+            </button>
+          </div>
         </div>
         
         <div id="envStatus" class="space-y-4">
@@ -212,8 +217,9 @@
       document.getElementById('adminName').textContent = name;
       document.getElementById('adminEmail').textContent = email;
       
-      // Load sources
+      // Load sources and env status
       loadSources();
+      loadEnvStatus();
     })();
 
     // ==========================================
@@ -316,6 +322,233 @@
     ];
 
     let sources = [];
+
+    // ==========================================
+    // LOAD ENVIRONMENT STATUS
+    // ==========================================
+    async function loadEnvStatus() {
+      try {
+        const response = await adminFetch(`${API_BASE}/api/admin/env-status`);
+        if (!response) return;
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          renderEnvStatus(data);
+        }
+      } catch (error) {
+        console.error('Failed to load env status:', error);
+        document.getElementById('envStatus').innerHTML = `
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+            <p class="text-red-600">❌ Failed to load environment status</p>
+            <p class="text-sm text-red-500 mt-1">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderEnvStatus(data) {
+      const container = document.getElementById('envStatus');
+      
+      const { status, auth, aiProviders, databases, storage, deployment } = data;
+      
+      // Overall Status
+      const statusColor = status.overall === 'healthy' ? 'green' : 'amber';
+      const statusIcon = status.overall === 'healthy' ? '✅' : '⚠️';
+      
+      let html = `
+        <!-- Overall Status -->
+        <div class="bg-${statusColor}-50 border-l-4 border-${statusColor}-500 p-4 rounded-lg">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">${statusIcon}</span>
+            <div class="flex-1">
+              <h3 class="font-bold text-${statusColor}-900">System Status: ${status.overall === 'healthy' ? 'Healthy' : 'Needs Attention'}</h3>
+              ${status.warnings.length > 0 ? `
+                <ul class="mt-2 text-sm text-${statusColor}-700 space-y-1">
+                  ${status.warnings.map(w => `<li>• ${w}</li>`).join('')}
+                </ul>
+              ` : '<p class="text-sm text-green-700 mt-1">All systems operational</p>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-4 gap-4">
+          <div class="bg-blue-50 rounded-lg p-4 text-center">
+            <div class="text-3xl mb-2">${status.hasAuth ? '✅' : '❌'}</div>
+            <div class="font-semibold text-blue-900">Authentication</div>
+            <div class="text-xs text-blue-600 mt-1">${auth.adminEmails} admin(s)</div>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-4 text-center">
+            <div class="text-3xl mb-2">${status.hasAI ? '✅' : '❌'}</div>
+            <div class="font-semibold text-purple-900">AI Providers</div>
+            <div class="text-xs text-purple-600 mt-1">${Object.values(aiProviders).filter(p => p.configured).length} active</div>
+          </div>
+          <div class="bg-green-50 rounded-lg p-4 text-center">
+            <div class="text-3xl mb-2">${status.hasStorage ? '✅' : '⚠️'}</div>
+            <div class="font-semibold text-green-900">Databases</div>
+            <div class="text-xs text-green-600 mt-1">${storage.total} MB total</div>
+          </div>
+          <div class="bg-amber-50 rounded-lg p-4 text-center">
+            <div class="text-3xl mb-2">${deployment.isProduction ? '🚀' : '🔧'}</div>
+            <div class="font-semibold text-amber-900">Deployment</div>
+            <div class="text-xs text-amber-600 mt-1">${deployment.nodeEnv}</div>
+          </div>
+        </div>
+
+        <!-- Authentication Details -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            🔐 Authentication Config
+          </h3>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-600">Admin Emails:</span>
+              <span class="font-mono font-semibold">${auth.adminEmails}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">Password Set:</span>
+              <span class="font-mono font-semibold">${auth.adminPassword ? '✅' : '❌'}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">JWT Secret:</span>
+              <span class="font-mono font-semibold">${auth.jwtSecret ? '✅' : '❌'}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">Secret Length:</span>
+              <span class="font-mono font-semibold ${auth.isSecure ? 'text-green-600' : 'text-red-600'}">${auth.jwtSecretLength} chars ${auth.isSecure ? '✅' : '⚠️'}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Providers Details -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            🤖 AI Providers
+          </h3>
+          <div class="space-y-3">
+            ${Object.entries(aiProviders).map(([name, provider]) => `
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg ${provider.configured ? 'bg-green-100' : 'bg-gray-100'} flex items-center justify-center">
+                    <span class="text-xl">${provider.configured ? '✅' : '❌'}</span>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 capitalize">${name}</div>
+                    <div class="text-xs text-gray-500">${provider.models.join(', ')}</div>
+                  </div>
+                </div>
+                ${provider.configured ? `
+                  <div class="text-xs font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                    ${provider.key}
+                  </div>
+                ` : `
+                  <span class="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded">Not configured</span>
+                `}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Database Details -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            💾 Database Configuration
+          </h3>
+          
+          <!-- Storage Summary -->
+          <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-4">
+            <div class="text-center">
+              <div class="text-3xl font-bold text-purple-600">${storage.total} MB</div>
+              <div class="text-sm text-gray-600">Total Free Storage Available</div>
+              <div class="text-xs text-gray-500 mt-2">
+                MongoDB: ${storage.mongodb.total} MB • 
+                Supabase: ${storage.supabase.total} MB • 
+                Vercel KV: ${storage.vercelKV.capacity} MB
+              </div>
+            </div>
+          </div>
+
+          <!-- MongoDB -->
+          ${databases.mongodb.length > 0 ? `
+            <div class="mb-4">
+              <h4 class="font-semibold text-gray-800 mb-2">📦 MongoDB Databases (${databases.mongodb.length}/10)</h4>
+              <div class="space-y-2">
+                ${databases.mongodb.map(db => `
+                  <div class="flex items-center justify-between p-2 bg-white rounded text-sm">
+                    <div class="flex items-center gap-2">
+                      <span class="text-green-500">✓</span>
+                      <span class="font-semibold">${db.name}</span>
+                      <span class="text-gray-500">→</span>
+                      <span class="text-gray-600">${db.database}</span>
+                    </div>
+                    <span class="text-xs font-mono text-gray-500">${db.uri}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : '<div class="text-sm text-gray-500 mb-4">No MongoDB configured</div>'}
+
+          <!-- Supabase -->
+          ${databases.supabase.length > 0 ? `
+            <div class="mb-4">
+              <h4 class="font-semibold text-gray-800 mb-2">🗄️ Supabase Databases (${databases.supabase.length}/5)</h4>
+              <div class="space-y-2">
+                ${databases.supabase.map(db => `
+                  <div class="flex items-center justify-between p-2 bg-white rounded text-sm">
+                    <div class="flex items-center gap-2">
+                      <span class="text-green-500">✓</span>
+                      <span class="font-semibold">${db.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-gray-500">${db.url}</span>
+                      <span class="text-xs font-mono text-gray-500">${db.key}</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : '<div class="text-sm text-gray-500 mb-4">No Supabase configured</div>'}
+
+          <!-- Vercel KV -->
+          <div>
+            <h4 class="font-semibold text-gray-800 mb-2">⚡ Vercel KV</h4>
+            <div class="p-2 bg-white rounded text-sm">
+              ${databases.vercelKV.configured ? `
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="text-green-500">✓</span>
+                    <span class="font-semibold">Configured</span>
+                  </div>
+                  <span class="text-xs font-mono text-gray-500">${databases.vercelKV.token}</span>
+                </div>
+              ` : '<span class="text-gray-500">Not configured</span>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Deployment Info -->
+        ${deployment.vercelUrl ? `
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+              🚀 Deployment Info
+            </h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Vercel URL:</span>
+                <a href="https://${deployment.vercelUrl}" target="_blank" class="text-blue-600 hover:underline font-mono">${deployment.vercelUrl}</a>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Environment:</span>
+                <span class="font-mono font-semibold ${deployment.isProduction ? 'text-green-600' : 'text-amber-600'}">${deployment.nodeEnv}</span>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      `;
+      
+      container.innerHTML = html;
+    }
 
     // ==========================================
     // LOAD SOURCES FROM SERVER
