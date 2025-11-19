@@ -1,4 +1,4 @@
-// api/admin/env-status.js - Simplified without JWT dependency
+// api/admin/env-status.js - FIXED VERSION
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,14 +18,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Basic auth check - just verify token exists
+    // Basic auth check - only check authorization header (server-side)
     const authHeader = req.headers.authorization;
-    const token = localStorage?.getItem('admin_token') || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
     
-    if (!token && !authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ 
         success: false,
         error: 'Unauthorized - No token provided' 
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Simple token validation - just check it exists and has reasonable length
+    if (!token || token.length < 10) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid token format' 
       });
     }
 
