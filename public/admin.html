@@ -337,7 +337,11 @@
           </div>
         `;
 
-        const response = await adminFetch(`${API_BASE}/api/admin/env-status`);
+        // Fix: Ensure correct URL without trailing characters
+        const apiUrl = `${API_BASE}/api/admin/env-status`;
+        console.log('Fetching env status from:', apiUrl);
+        
+        const response = await adminFetch(apiUrl);
         
         if (!response) {
           throw new Error('No response from server');
