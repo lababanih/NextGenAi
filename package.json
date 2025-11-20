@@ -1,6 +1,7 @@
 {
   "name": "self-learning-ai",
   "version": "1.0.0",
+  "type": "module",
   "description": "AI that learns from other AIs",
   "scripts": {
     "dev": "vercel dev",
