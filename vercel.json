@@ -32,6 +32,10 @@
       "dest": "/api/admin/sources.js"
     },
     {
+      "src": "/api/admin/env-status",
+      "dest": "/api/admin/env-status.js"
+    },
+    {
       "src": "/api/admin/test",
       "dest": "/api/admin/test.js"
     },
