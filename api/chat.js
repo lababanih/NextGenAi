@@ -1,7 +1,9 @@
 // api/chat.js
-// ULTIMATE UNLIMITED TOKEN SYSTEM
-// Automatically handles ANY complexity with smart routing
-// FREE (Groq 32K) + FREE Backup (Gemini 2M) + Premium (Claude 200K)
+// INTEGRATED MEMORY-FIRST CHAT SYSTEM
+// Check database → Query AIs → Synthesize → Auto-save
+
+import dbManager from './database/manager.js';
+import { getEnabledAISources } from './config/unified.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,46 +19,139 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, aiSources } = req.body;
+    const { messages, aiSources: clientSources, useMemory = true } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Messages array required' });
     }
 
-    // Get providers and enhance with model capabilities
-    let providers = getEnabledProviders(aiSources);
-    providers = providers.map(p => enhanceProviderInfo(p));
+    const userMessage = messages[messages.length - 1].content;
+    const userLanguage = detectLanguage(userMessage);
+
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`🚀 NEW REQUEST: "${userMessage.substring(0, 50)}..."`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    // ==========================================
+    // STEP 1: CHECK MEMORY FIRST (if enabled)
+    // ==========================================
+    
+    if (useMemory) {
+      console.log('📚 STEP 1: Checking knowledge base...');
+      
+      try {
+        await dbManager.initialize();
+        
+        const memoryResults = await dbManager.searchKnowledge(userMessage, {
+          language: userLanguage,
+          limit: 3
+        });
+
+        if (memoryResults.length > 0) {
+          const bestMatch = memoryResults[0];
+          const similarity = calculateSimilarity(userMessage, bestMatch.topic);
+
+          console.log(`  🔍 Found ${memoryResults.length} potential matches`);
+          console.log(`  📊 Best match: "${bestMatch.topic.substring(0, 50)}..."`);
+          console.log(`  🎯 Similarity: ${Math.round(similarity * 100)}%`);
+
+          // If similarity is high enough, return from memory
+          if (similarity > 0.65) {
+            console.log(`  ✅ RETURNING FROM MEMORY (threshold: 65%)\n`);
+            
+            const answer = formatMemoryAnswer(bestMatch);
+            
+            return res.json({
+              answer,
+              metadata: {
+                source: 'memory',
+                database: bestMatch.source_db,
+                confidence: Math.round(similarity * 100),
+                learnedAt: bestMatch.createdAt,
+                fast: true,
+                duration: 0,
+                cost: 0,
+                language: userLanguage,
+                fromCache: true
+              }
+            });
+          } else {
+            console.log(`  ⚠️  Similarity too low (${Math.round(similarity * 100)}% < 65%), querying AIs...\n`);
+          }
+        } else {
+          console.log(`  ℹ️  No matches found in memory, querying AIs...\n`);
+        }
+      } catch (error) {
+        console.error('  ❌ Memory check failed:', error.message);
+        console.log('  ➡️  Continuing with AI query...\n');
+      }
+    } else {
+      console.log('📚 STEP 1: Memory disabled, skipping...\n');
+    }
+
+    // ==========================================
+    // STEP 2: LOAD AI SOURCES
+    // ==========================================
+
+    console.log('🤖 STEP 2: Loading AI sources...');
+
+    let providers;
+
+    // Check client sources first (admin panel)
+    if (clientSources && Array.isArray(clientSources) && clientSources.length > 0) {
+      const validClientSources = clientSources.filter(s => s.enabled && s.apiKey && s.apiKey.length > 5);
+      
+      if (validClientSources.length > 0) {
+        console.log(`  🔧 Using ${validClientSources.length} sources from CLIENT (admin panel)`);
+        providers = validClientSources;
+      }
+    }
+
+    // Otherwise load from unified config (env vars)
+    if (!providers || providers.length === 0) {
+      console.log('  🌍 Loading from UNIFIED CONFIG (environment variables)');
+      providers = await getEnabledAISources();
+    }
 
     if (providers.length === 0) {
       return res.status(500).json({
         error: 'No AI providers configured',
-        message: 'Please add at least one API key in admin panel'
+        message: 'Please configure at least one AI source'
       });
     }
 
-    console.log(`🚀 ULTIMATE System initialized with ${providers.length} provider(s)`);
+    console.log(`  ✅ ${providers.length} AI source(s) loaded\n`);
 
-    // Detect language
-    const userLanguage = detectLanguage(messages[messages.length - 1].content);
-    
-    // Analyze complexity deeply
-    const analysis = analyzeComplexityDeep(messages[messages.length - 1].content);
-    
-    console.log(`📊 Analysis:
-    - Complexity: ${analysis.level}
-    - Files needed: ${analysis.filesNeeded}
-    - Estimated tokens: ${analysis.estimatedTokens}
-    - Estimated lines: ${analysis.estimatedLines}`);
+    // Enhance providers with capabilities
+    providers = providers.map(p => enhanceProviderInfo(p));
 
-    // Select optimal strategy
+    // ==========================================
+    // STEP 3: ANALYZE & SELECT STRATEGY
+    // ==========================================
+
+    console.log('📊 STEP 3: Analyzing query complexity...');
+
+    const analysis = analyzeComplexityDeep(userMessage);
+    
+    console.log(`  📈 Complexity: ${analysis.level}`);
+    console.log(`  📁 Files needed: ${analysis.filesNeeded}`);
+    console.log(`  📏 Estimated tokens: ${analysis.estimatedTokens}`);
+    console.log(`  📝 Estimated lines: ${analysis.estimatedLines}\n`);
+
     const strategy = selectOptimalStrategy(providers, analysis);
     
-    console.log(`🎯 Selected strategy: ${strategy.name}
-    - Model: ${strategy.model.name} (${strategy.model.maxTokens} tokens)
-    - Approach: ${strategy.approach}
-    - Turns: ${strategy.turns || 1}`);
+    console.log(`🎯 STEP 4: Selected strategy: ${strategy.name}`);
+    console.log(`  🤖 Model: ${strategy.model.name}`);
+    console.log(`  📦 Capacity: ${strategy.model.maxTokens} tokens`);
+    console.log(`  🎬 Approach: ${strategy.approach}`);
+    console.log(`  🔄 Turns: ${strategy.turns || 1}\n`);
 
-    // Create enhanced prompt
+    // ==========================================
+    // STEP 5: CREATE ENHANCED PROMPT
+    // ==========================================
+
+    console.log('✍️  STEP 5: Creating enhanced prompt...');
+
     const enhancedMessages = createUltimatePrompt(
       messages, 
       userLanguage, 
@@ -64,32 +159,78 @@ export default async function handler(req, res) {
       strategy
     );
 
-    // Execute strategy
+    console.log(`  ✅ Prompt enhanced\n`);
+
+    // ==========================================
+    // STEP 6: EXECUTE STRATEGY
+    // ==========================================
+
+    console.log('⚡ STEP 6: Executing AI query...');
+
+    const startTime = Date.now();
     const result = await executeStrategy(strategy, enhancedMessages, providers);
+    const duration = Date.now() - startTime;
     
-    console.log(`✅ Generation complete:
-    - Output tokens: ${result.tokensGenerated}
-    - Output lines: ${result.linesGenerated}
-    - Time: ${result.duration}ms
-    - Cost: $${result.cost.toFixed(4)}`);
+    console.log(`  ✅ Generation complete in ${duration}ms`);
+    console.log(`  📊 Output: ${result.tokensGenerated} tokens, ${result.linesGenerated} lines`);
+    console.log(`  💰 Cost: $${result.cost.toFixed(6)}\n`);
+
+    // ==========================================
+    // STEP 7: AUTO-SAVE TO MEMORY
+    // ==========================================
+
+    if (useMemory && result.answer) {
+      console.log('💾 STEP 7: Auto-saving to knowledge base...');
+      
+      try {
+        const saved = await autoSaveToMemory(
+          userMessage, 
+          result.answer, 
+          userLanguage,
+          analysis
+        );
+        
+        if (saved) {
+          console.log(`  ✅ Saved to: ${saved.database}`);
+          console.log(`  📦 ID: ${saved.id}\n`);
+        }
+      } catch (error) {
+        console.error('  ⚠️  Auto-save failed (non-critical):', error.message, '\n');
+      }
+    } else {
+      console.log('💾 STEP 7: Memory disabled, skipping auto-save\n');
+    }
+
+    console.log(`${'='.repeat(60)}`);
+    console.log(`✅ REQUEST COMPLETE`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    // ==========================================
+    // RETURN RESPONSE
+    // ==========================================
 
     return res.json({
       answer: result.answer,
       metadata: {
         strategy: strategy.name,
         model: strategy.model.name,
+        modelSource: strategy.model.source || 'client',
         tokensGenerated: result.tokensGenerated,
         linesGenerated: result.linesGenerated,
         confidence: result.confidence,
-        duration: result.duration,
+        duration,
         cost: result.cost,
         language: userLanguage,
-        complexity: analysis.level
+        complexity: analysis.level,
+        savedToMemory: useMemory,
+        fromCache: false
       }
     });
 
   } catch (error) {
-    console.error('❌ Ultimate system error:', error);
+    console.error('\n❌ SYSTEM ERROR:', error);
+    console.error('Stack:', error.stack, '\n');
+    
     return res.status(500).json({
       error: 'Generation failed',
       message: error.message
@@ -97,22 +238,115 @@ export default async function handler(req, res) {
   }
 }
 
-// ========================================
-// DEEP COMPLEXITY ANALYSIS
-// ========================================
+// ==========================================
+// AUTO-SAVE TO MEMORY
+// ==========================================
+
+async function autoSaveToMemory(question, answer, language, analysis) {
+  try {
+    // Extract code blocks
+    const codeBlocks = answer.match(/```(\w+)?\n([\s\S]*?)```/g);
+    
+    let code = null;
+    if (codeBlocks && codeBlocks.length > 0) {
+      code = codeBlocks.map(block => {
+        const match = block.match(/```(\w+)?\n([\s\S]*?)```/);
+        return {
+          language: match[1] || 'code',
+          code: match[2].trim()
+        };
+      });
+    }
+
+    // Generate topic (first 100 chars)
+    const topic = question.substring(0, 100).trim();
+
+    // Extract tags
+    const tags = extractTags(question + ' ' + answer);
+
+    // Save to database
+    const result = await dbManager.saveKnowledge({
+      topic,
+      language,
+      content: answer,
+      code: code ? JSON.stringify(code) : null,
+      tags,
+      metadata: {
+        originalQuestion: question,
+        complexity: analysis.level,
+        filesCount: analysis.filesNeeded,
+        source: 'auto-learned',
+        learnedAt: new Date()
+      }
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('Auto-save error:', error);
+    throw error;
+  }
+}
+
+// ==========================================
+// MEMORY HELPERS
+// ==========================================
+
+function formatMemoryAnswer(knowledge) {
+  let answer = knowledge.content;
+
+  // Add code if present
+  if (knowledge.code) {
+    try {
+      const codeBlocks = JSON.parse(knowledge.code);
+      if (Array.isArray(codeBlocks)) {
+        answer += '\n\n' + codeBlocks.map(block => 
+          `\`\`\`${block.language}\n${block.code}\n\`\`\``
+        ).join('\n\n');
+      }
+    } catch (e) {
+      // Code is in plain format
+      if (knowledge.code.trim()) {
+        answer += '\n\n```\n' + knowledge.code + '\n```';
+      }
+    }
+  }
+
+  // Add metadata info
+  answer += `\n\n---\n*💡 Retrieved from knowledge base (learned: ${new Date(knowledge.createdAt).toLocaleDateString()})*`;
+
+  return answer;
+}
+
+function calculateSimilarity(str1, str2) {
+  const words1 = str1.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const words2 = str2.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  
+  if (words1.length === 0 || words2.length === 0) return 0;
+  
+  const commonWords = words1.filter(w => words2.includes(w));
+  
+  return commonWords.length / Math.max(words1.length, words2.length);
+}
+
+function extractTags(text) {
+  const keywords = text.toLowerCase().match(/\b(react|vue|angular|node|python|javascript|typescript|java|php|ruby|go|rust|api|database|mongodb|sql|postgresql|mysql|redis|authentication|auth|security|performance|optimization|tutorial|guide|example|component|function|class|hook|state|props|async|await|promise|fetch|axios|express|fastapi|django|flask|spring|laravel|nextjs|vercel|deployment|docker|kubernetes|aws|azure|gcp|frontend|backend|fullstack|html|css|tailwind|bootstrap|testing|jest|cypress|git|github|ci|cd|agile|scrum)\b/g);
+  return keywords ? [...new Set(keywords)].slice(0, 15) : [];
+}
+
+// ==========================================
+// COMPLEXITY ANALYSIS
+// ==========================================
 
 function analyzeComplexityDeep(text) {
   const lowerText = text.toLowerCase();
   
-  // Detect explicit file requests
   const fileMatch = text.match(/(\d+)\s*(file|files|modul)/i);
   const explicitFiles = fileMatch ? parseInt(fileMatch[1]) : 0;
   
-  // Count features/requirements
   const numberedItems = (text.match(/\d+\./g) || []).length;
   const bulletPoints = (text.match(/[-•*]\s/g) || []).length;
   
-  // Detect comprehensive keywords
   const comprehensiveKeywords = [
     'lengkap', 'complete', 'full', 'penuh',
     'seperti', 'like', 'kohl', 'claude', 'sonnet',
@@ -121,11 +355,9 @@ function analyzeComplexityDeep(text) {
   ];
   const comprehensiveScore = comprehensiveKeywords.filter(k => lowerText.includes(k)).length;
   
-  // Detect feature keywords
   const featureKeywords = ['dengan', 'with', 'include', 'termasuk', 'fitur', 'feature'];
   const featureScore = featureKeywords.filter(k => lowerText.includes(k)).length;
   
-  // Calculate files needed
   let filesNeeded = 1;
   
   if (explicitFiles > 0) {
@@ -138,18 +370,14 @@ function analyzeComplexityDeep(text) {
     filesNeeded = 2;
   }
   
-  // Estimate lines per file
   const linesPerFile = filesNeeded <= 1 ? 150 : 
                        filesNeeded <= 2 ? 250 :
                        filesNeeded <= 3 ? 300 :
                        filesNeeded <= 5 ? 280 : 250;
   
   const estimatedLines = filesNeeded * linesPerFile;
+  const estimatedTokens = estimatedLines * 25 + 2000;
   
-  // Estimate tokens (1 line ≈ 25 tokens average)
-  const estimatedTokens = estimatedLines * 25 + 2000; // +2000 for instructions
-  
-  // Determine complexity level
   let level = 'simple';
   if (estimatedTokens > 60000) level = 'extreme';
   else if (estimatedTokens > 35000) level = 'very-complex';
@@ -167,14 +395,12 @@ function analyzeComplexityDeep(text) {
   };
 }
 
-// ========================================
-// PROVIDER INFO ENHANCEMENT
-// ========================================
+// ==========================================
+// PROVIDER ENHANCEMENT
+// ==========================================
 
 function enhanceProviderInfo(provider) {
   const enhanced = { ...provider };
-  
-  // Get model capabilities
   const capabilities = getModelCapabilities(provider.provider, provider.model);
   
   enhanced.maxTokens = capabilities.maxTokens;
@@ -187,67 +413,16 @@ function enhanceProviderInfo(provider) {
 
 function getModelCapabilities(provider, model) {
   const capabilities = {
-    // Groq models (FREE, FAST)
-    'llama-3.3-70b-versatile': {
-      maxTokens: 32000,
-      costPerToken: 0,
-      speed: 'very-fast',
-      quality: 'high'
-    },
-    'llama-3.1-70b-versatile': {
-      maxTokens: 8000,
-      costPerToken: 0,
-      speed: 'very-fast',
-      quality: 'high'
-    },
-    
-    // Google models (FREE, SLOW, HUGE CAPACITY)
-    'gemini-1.5-pro': {
-      maxTokens: 2000000,
-      costPerToken: 0,
-      speed: 'slow',
-      quality: 'very-high'
-    },
-    'gemini-1.5-flash': {
-      maxTokens: 1000000,
-      costPerToken: 0,
-      speed: 'medium',
-      quality: 'high'
-    },
-    
-    // OpenRouter models (PAID, HIGH QUALITY)
-    'openai/gpt-4-turbo': {
-      maxTokens: 128000,
-      costPerToken: 0.00001,
-      speed: 'fast',
-      quality: 'very-high'
-    },
-    'anthropic/claude-3.5-sonnet': {
-      maxTokens: 200000,
-      costPerToken: 0.000003,
-      speed: 'fast',
-      quality: 'excellent'
-    },
-    'anthropic/claude-3-opus': {
-      maxTokens: 200000,
-      costPerToken: 0.000015,
-      speed: 'medium',
-      quality: 'excellent'
-    },
-    'openai/gpt-3.5-turbo': {
-      maxTokens: 16385,
-      costPerToken: 0.0000005,
-      speed: 'very-fast',
-      quality: 'good'
-    }
+    'llama-3.3-70b-versatile': { maxTokens: 32000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
+    'llama-3.1-70b-versatile': { maxTokens: 8000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
+    'gemini-1.5-pro': { maxTokens: 2000000, costPerToken: 0, speed: 'slow', quality: 'very-high' },
+    'gemini-1.5-flash': { maxTokens: 1000000, costPerToken: 0, speed: 'medium', quality: 'high' },
+    'openai/gpt-4-turbo': { maxTokens: 128000, costPerToken: 0.00001, speed: 'fast', quality: 'very-high' },
+    'anthropic/claude-3.5-sonnet': { maxTokens: 200000, costPerToken: 0.000003, speed: 'fast', quality: 'excellent' }
   };
   
-  // Try exact match
-  if (capabilities[model]) {
-    return capabilities[model];
-  }
+  if (capabilities[model]) return capabilities[model];
   
-  // Default by provider
   const defaults = {
     'groq': { maxTokens: 8000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
     'openrouter': { maxTokens: 8000, costPerToken: 0.000001, speed: 'medium', quality: 'high' },
@@ -257,22 +432,18 @@ function getModelCapabilities(provider, model) {
   return defaults[provider] || { maxTokens: 4096, costPerToken: 0.000001, speed: 'medium', quality: 'medium' };
 }
 
-// ========================================
+// ==========================================
 // STRATEGY SELECTION
-// ========================================
+// ==========================================
 
 function selectOptimalStrategy(providers, analysis) {
   const tokensNeeded = analysis.estimatedTokens;
-  
-  // Sort providers by capability
   const sortedProviders = providers.sort((a, b) => {
-    // Prioritize free first, then capacity
     if (a.costPerToken === 0 && b.costPerToken > 0) return -1;
     if (a.costPerToken > 0 && b.costPerToken === 0) return 1;
     return b.maxTokens - a.maxTokens;
   });
   
-  // Find suitable single-turn model
   const singleTurnModel = sortedProviders.find(p => p.maxTokens >= tokensNeeded * 1.2);
   
   if (singleTurnModel) {
@@ -285,9 +456,8 @@ function selectOptimalStrategy(providers, analysis) {
     };
   }
   
-  // No single model can handle? Use multi-turn with best model
   const bestModel = sortedProviders[0];
-  const turns = Math.ceil(tokensNeeded / (bestModel.maxTokens * 0.9)); // 90% utilization
+  const turns = Math.ceil(tokensNeeded / (bestModel.maxTokens * 0.9));
   
   return {
     name: 'multi-turn-chunked',
@@ -298,22 +468,20 @@ function selectOptimalStrategy(providers, analysis) {
   };
 }
 
-// ========================================
+// ==========================================
 // STRATEGY EXECUTION
-// ========================================
+// ==========================================
 
 async function executeStrategy(strategy, messages, providers) {
-  const startTime = Date.now();
-  
-  let result;
-  
   if (strategy.approach === 'single-turn') {
-    result = await executeSingleTurn(strategy, messages);
+    return await executeSingleTurn(strategy, messages);
   } else {
-    result = await executeMultiTurn(strategy, messages);
+    return await executeMultiTurn(strategy, messages);
   }
-  
-  const duration = Date.now() - startTime;
+}
+
+async function executeSingleTurn(strategy, messages) {
+  const result = await queryAIProvider(strategy.model, messages);
   const tokensGenerated = estimateTokens(result.answer);
   const linesGenerated = result.answer.split('\n').length;
   const cost = tokensGenerated * strategy.model.costPerToken;
@@ -322,44 +490,22 @@ async function executeStrategy(strategy, messages, providers) {
     answer: result.answer,
     tokensGenerated,
     linesGenerated,
-    duration,
     cost,
-    confidence: result.confidence
-  };
-}
-
-async function executeSingleTurn(strategy, messages) {
-  console.log(`⚡ Single-turn generation with ${strategy.model.name}...`);
-  
-  const result = await queryAIProvider(strategy.model, messages);
-  
-  return {
-    answer: result.answer,
     confidence: 98
   };
 }
 
 async function executeMultiTurn(strategy, messages) {
-  console.log(`📚 Multi-turn generation (${strategy.turns} turns) with ${strategy.model.name}...`);
-  
   const originalPrompt = messages[messages.length - 1].content;
   const systemPrompt = messages.find(m => m.role === 'system');
-  
   const parts = [];
-  const filesPerTurn = Math.ceil(strategy.model.maxTokens / 10000); // Rough estimate
   
   for (let turn = 0; turn < strategy.turns; turn++) {
-    const turnStart = turn * filesPerTurn + 1;
-    const turnEnd = Math.min((turn + 1) * filesPerTurn, 999);
-    
-    console.log(`  Turn ${turn + 1}/${strategy.turns}: Generating content part ${turn + 1}...`);
-    
-    // Create turn-specific prompt
     const turnPrompt = {
       role: 'user',
       content: turn === 0 ? 
         originalPrompt + `\n\n[Generate first part completely]` :
-        `Continue from previous response. Generate next part completely.\n\nPrevious output:\n${parts[parts.length - 1].substring(parts[parts.length - 1].length - 500)}\n\n[Continue and complete remaining content]`
+        `Continue from previous. Generate next part.\n\n${parts[parts.length - 1].substring(parts[parts.length - 1].length - 500)}`
     };
     
     const turnMessages = systemPrompt ? [systemPrompt, turnPrompt] : [turnPrompt];
@@ -368,273 +514,75 @@ async function executeMultiTurn(strategy, messages) {
       const result = await queryAIProvider(strategy.model, turnMessages);
       parts.push(result.answer);
       
-      console.log(`  ✅ Turn ${turn + 1} complete (${estimateTokens(result.answer)} tokens)`);
-      
-      // Check if generation seems complete
       if (detectCompleteness(result.answer) && turn < strategy.turns - 1) {
-        console.log(`  ℹ️ Generation appears complete at turn ${turn + 1}, stopping early`);
         break;
       }
     } catch (error) {
-      console.error(`  ❌ Turn ${turn + 1} failed:`, error.message);
       if (parts.length === 0) throw error;
-      break; // Use what we have so far
+      break;
     }
   }
   
-  // Combine all parts
   const combined = parts.join('\n\n');
+  const tokensGenerated = estimateTokens(combined);
+  const linesGenerated = combined.split('\n').length;
+  const cost = tokensGenerated * strategy.model.costPerToken;
   
   return {
     answer: combined,
+    tokensGenerated,
+    linesGenerated,
+    cost,
     confidence: 95
   };
 }
 
 function detectCompleteness(text) {
-  // Check for completion markers
-  const completionMarkers = [
-    'setup instructions',
-    'usage example',
-    'customization',
-    'installation',
-    'readme',
-    'that\'s it',
-    'you\'re done',
-    'selesai',
-    'demikian',
-    'semoga membantu'
-  ];
-  
+  const markers = ['setup instructions', 'usage example', 'selesai', 'demikian'];
   const lowerText = text.toLowerCase();
-  const hasMarkers = completionMarkers.filter(m => lowerText.includes(m)).length >= 2;
-  
-  // Check for multiple complete code blocks
+  const hasMarkers = markers.filter(m => lowerText.includes(m)).length >= 2;
   const codeBlocks = (text.match(/```/g) || []).length / 2;
-  const hasMultipleFiles = codeBlocks >= 3;
-  
-  return hasMarkers && hasMultipleFiles;
+  return hasMarkers && codeBlocks >= 3;
 }
 
-// ========================================
-// ULTIMATE PROMPT CREATION
-// ========================================
+// ==========================================
+// PROMPT CREATION
+// ==========================================
 
 function createUltimatePrompt(messages, userLanguage, analysis, strategy) {
   const isIndonesian = userLanguage === 'indonesian';
   
   const prompt = {
     role: 'system',
-    content: `You are Claude Sonnet 4.5 - the world's most advanced coding assistant.
+    content: `You are Claude Sonnet 4.5 - advanced coding assistant.
 
-${isIndonesian ? `
-# INSTRUKSI ULTRA-KRITIS
+Target: ${analysis.filesNeeded} files, ${analysis.estimatedLines} lines, ${analysis.estimatedTokens} tokens
 
-## Target Output:
-- **${analysis.filesNeeded} files** LENGKAP
-- **${analysis.estimatedLines} lines** total code
-- **${analysis.estimatedTokens} tokens** output
-${strategy.approach === 'multi-turn' ? `
-- **Multi-turn generation** (part ${strategy.turns > 1 ? '1 of ' + strategy.turns : '1'})`
-: ''}
+${isIndonesian ? 'ATURAN: Generate LENGKAP, NO placeholders, ALL functions implemented!' : 'RULES: Generate COMPLETE, NO placeholders, ALL functions implemented!'}
 
-## ATURAN MUTLAK:
-
-### 1. COMPLETENESS (100%)
-SETIAP file HARUS:
-✅ 100% implemented (NO placeholders)
-✅ ALL functions FULLY coded
-✅ COMPLETE error handling
-✅ COMPLETE input validation
-✅ COMPLETE documentation
-✅ Usage examples included
-
-DILARANG:
-❌ "Tambahkan sendiri"
-❌ "..." atau "etc"
-❌ "TODO" comments
-❌ "Sisanya sama"
-❌ Cutting code mid-function
-
-### 2. QUALITY STANDARDS
-
-Setiap baris code HARUS:
-- Production-ready
-- Best practices
-- Security conscious
-- Performance optimized
-- Well documented (Bahasa Indonesia)
-- Properly formatted
-
-### 3. FILE STRUCTURE
-
-${analysis.filesNeeded === 1 ? `
-Generate 1 MASSIVE complete file dengan semua fungsi.
-` : analysis.filesNeeded <= 3 ? `
-Generate ${analysis.filesNeeded} files:
-1. Config/Constants
-2. Core Logic (LARGEST)
-3. UI/Helper Functions
-` : `
-Generate ${analysis.filesNeeded} files:
-1. Config Module (100-150 lines)
-2. Core Logic (300-400 lines)
-3. UI Module (250-300 lines)
-4. Commands/Handlers (200-250 lines)
-5. Main Orchestrator (150-200 lines)
-`}
-
-### 4. OUTPUT FORMAT
-
-Untuk SETIAP file:
-
-\`\`\`lua
--- =====================================
--- FILE: [nama].lua
--- DESKRIPSI: [jelaskan detail]
--- DEPENDENCIES: [list semua]
--- AUTHOR: NextGenAI
--- =====================================
-
-[FULL IMPLEMENTATION - JANGAN POTONG!]
-
--- =====================================
--- USAGE EXAMPLE:
--- [contoh lengkap]
--- =====================================
-
-return Module
-\`\`\`
-
-### 5. MINDSET
-
-Bayangkan user adalah:
-- Senior developer yang sibuk
-- Butuh code production-ready SEKARANG
-- Tidak punya waktu debug atau tambah kode
-- Expect quality seperti membeli premium code
-
-Deliver EXACTLY what Claude Sonnet 4.5 delivers!
-
-` : `
-# ULTRA-CRITICAL INSTRUCTIONS
-
-## Target Output:
-- **${analysis.filesNeeded} files** COMPLETE
-- **${analysis.estimatedLines} lines** total code
-- **${analysis.estimatedTokens} tokens** output
-${strategy.approach === 'multi-turn' ? `
-- **Multi-turn generation** (part ${strategy.turns > 1 ? '1 of ' + strategy.turns : '1'})`
-: ''}
-
-## ABSOLUTE RULES:
-
-### 1. COMPLETENESS (100%)
-EVERY file MUST:
-✅ 100% implemented (NO placeholders)
-✅ ALL functions FULLY coded
-✅ COMPLETE error handling
-✅ COMPLETE input validation
-✅ COMPLETE documentation
-✅ Usage examples included
-
-FORBIDDEN:
-❌ "Add yourself"
-❌ "..." or "etc"
-❌ "TODO" comments
-❌ "Rest is similar"
-❌ Cutting code mid-function
-
-### 2. QUALITY STANDARDS
-
-Every line MUST be:
-- Production-ready
-- Best practices
-- Security conscious
-- Performance optimized
-- Well documented (English)
-- Properly formatted
-
-### 3. FILE STRUCTURE
-
-${analysis.filesNeeded === 1 ? `
-Generate 1 MASSIVE complete file with all functions.
-` : analysis.filesNeeded <= 3 ? `
-Generate ${analysis.filesNeeded} files:
-1. Config/Constants
-2. Core Logic (LARGEST)
-3. UI/Helper Functions
-` : `
-Generate ${analysis.filesNeeded} files:
-1. Config Module (100-150 lines)
-2. Core Logic (300-400 lines)
-3. UI Module (250-300 lines)
-4. Commands/Handlers (200-250 lines)
-5. Main Orchestrator (150-200 lines)
-`}
-
-### 4. OUTPUT FORMAT
-
-For EVERY file:
-
-\`\`\`lua
--- =====================================
--- FILE: [name].lua
--- DESCRIPTION: [detailed]
--- DEPENDENCIES: [list all]
--- AUTHOR: NextGenAI
--- =====================================
-
-[FULL IMPLEMENTATION - DON'T CUT!]
-
--- =====================================
--- USAGE EXAMPLE:
--- [complete example]
--- =====================================
-
-return Module
-\`\`\`
-
-### 5. MINDSET
-
-Imagine user is:
-- Senior developer who's busy
-- Needs production-ready code NOW
-- No time to debug or add code
-- Expects quality like buying premium code
-
-Deliver EXACTLY what Claude Sonnet 4.5 delivers!
-`}
-
-## MODEL CAPABILITIES
-- max_tokens: ${strategy.model.maxTokens}
-- Your output target: ${analysis.estimatedTokens} tokens
-- Quality: ${strategy.model.quality}
-
-USE FULL CAPACITY! Generate ${analysis.estimatedLines}+ lines of COMPLETE code!`
+USE FULL CAPACITY!`
   };
   
   return [prompt, ...messages];
 }
 
-// ========================================
+// ==========================================
 // AI PROVIDER QUERY
-// ========================================
+// ==========================================
 
 async function queryAIProvider(provider, messages) {
   const requestBody = {
     model: provider.model,
-    messages: messages,
+    messages,
     temperature: 0.7,
-    max_tokens: Math.floor(provider.maxTokens * 0.95), // Use 95% of capacity
+    max_tokens: Math.floor(provider.maxTokens * 0.95),
     top_p: 0.95,
     stream: false
   };
   
   const headers = buildHeaders(provider);
-
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180000); // 3 min for large generation
+  const timeout = setTimeout(() => controller.abort(), 180000);
 
   try {
     const response = await fetch(provider.endpoint, {
@@ -658,24 +606,20 @@ async function queryAIProvider(provider, messages) {
       throw new Error('Empty response');
     }
 
-    return {
-      answer: answer.trim()
-    };
+    return { answer: answer.trim() };
   } catch (error) {
     clearTimeout(timeout);
-    if (error.name === 'AbortError') {
-      throw new Error('Timeout after 3 minutes');
-    }
+    if (error.name === 'AbortError') throw new Error('Timeout after 3 minutes');
     throw error;
   }
 }
 
-// ========================================
+// ==========================================
 // UTILITY FUNCTIONS
-// ========================================
+// ==========================================
 
 function detectLanguage(text) {
-  const indonesianWords = ['apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'dengan', 'untuk', 'seperti', 'lengkap'];
+  const indonesianWords = ['apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'dengan', 'untuk'];
   const lowerText = text.toLowerCase();
   const count = indonesianWords.filter(w => lowerText.includes(w)).length;
   return count >= 2 ? 'indonesian' : 'english';
@@ -691,15 +635,11 @@ function buildHeaders(provider) {
 
   if (providerType === 'groq' || providerType === 'openai') {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
-  }
-
-  if (providerType === 'openrouter') {
+  } else if (providerType === 'openrouter') {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
-    headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://next-gen-ai-azure.vercel.app/';
-    headers['X-Title'] = 'NextGenAI Ultimate Unlimited';
-  }
-
-  if (providerType === 'google') {
+    headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://next-gen-ai.vercel.app/';
+    headers['X-Title'] = 'NextGenAI';
+  } else if (providerType === 'google') {
     headers['x-goog-api-key'] = provider.apiKey;
   }
 
@@ -718,46 +658,4 @@ function extractAnswer(provider, data) {
   }
 
   return data.response || data.output || '';
-}
-
-function getEnabledProviders(aiSources) {
-  if (aiSources && Array.isArray(aiSources) && aiSources.length > 0) {
-    return aiSources
-      .filter(s => s.enabled && s.apiKey && s.apiKey.length > 5)
-      .sort((a, b) => a.priority - b.priority);
-  }
-
-  return getDefaultProviders();
-}
-
-function getDefaultProviders() {
-  const providers = [];
-
-  // Groq (FREE, 32K)
-  if (process.env.GROQ_API_KEY) {
-    providers.push({
-      name: 'Groq Llama 3.3 70B',
-      provider: 'groq',
-      model: 'llama-3.3-70b-versatile',
-      apiKey: process.env.GROQ_API_KEY,
-      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-      priority: 1,
-      enabled: true
-    });
-  }
-
-  // Google Gemini (FREE, 2M tokens!)
-  if (process.env.GOOGLE_API_KEY) {
-    providers.push({
-      name: 'Google Gemini 1.5 Pro',
-      provider: 'google',
-      model: 'gemini-1.5-pro',
-      apiKey: process.env.GOOGLE_API_KEY,
-      endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
-      priority: 2,
-      enabled: true
-    });
-  }
-
-  return providers;
 }
