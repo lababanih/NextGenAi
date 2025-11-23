@@ -1,9 +1,8 @@
 // api/chat.js
-// INTEGRATED MEMORY-FIRST CHAT SYSTEM
-// Check database → Query AIs → Synthesize → Auto-save
+// SIMPLIFIED MEMORY-FIRST CHAT SYSTEM
+// Uses environment variables ONLY (no admin panel for API keys)
 
 import dbManager from './database/manager.js';
-import { getEnabledAISources } from './config/unified.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, aiSources: clientSources, useMemory = true } = req.body;
+    const { messages, useMemory = true } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Messages array required' });
@@ -90,40 +89,29 @@ export default async function handler(req, res) {
     }
 
     // ==========================================
-    // STEP 2: LOAD AI SOURCES
+    // STEP 2: LOAD AI SOURCES FROM ENV VARS
     // ==========================================
 
-    console.log('🤖 STEP 2: Loading AI sources...');
+    console.log('🤖 STEP 2: Loading AI sources from environment...');
 
-    let providers;
-
-    // Check client sources first (admin panel)
-    if (clientSources && Array.isArray(clientSources) && clientSources.length > 0) {
-      const validClientSources = clientSources.filter(s => s.enabled && s.apiKey && s.apiKey.length > 5);
-      
-      if (validClientSources.length > 0) {
-        console.log(`  🔧 Using ${validClientSources.length} sources from CLIENT (admin panel)`);
-        providers = validClientSources;
-      }
-    }
-
-    // Otherwise load from unified config (env vars)
-    if (!providers || providers.length === 0) {
-      console.log('  🌍 Loading from UNIFIED CONFIG (environment variables)');
-      providers = await getEnabledAISources();
-    }
+    const providers = loadProvidersFromEnv();
 
     if (providers.length === 0) {
       return res.status(500).json({
         error: 'No AI providers configured',
-        message: 'Please configure at least one AI source'
+        message: 'Please set AI API keys in Vercel Environment Variables:\n' +
+                 '- GROQ_API_KEY (recommended - free)\n' +
+                 '- GOOGLE_API_KEY (optional - 2M tokens)\n' +
+                 '- OPENROUTER_API_KEY (optional - premium models)',
+        setup: 'Go to: Vercel Dashboard → Settings → Environment Variables'
       });
     }
 
-    console.log(`  ✅ ${providers.length} AI source(s) loaded\n`);
-
-    // Enhance providers with capabilities
-    providers = providers.map(p => enhanceProviderInfo(p));
+    console.log(`  ✅ ${providers.length} AI source(s) loaded from environment:`);
+    providers.forEach(p => {
+      console.log(`     - ${p.name} (${p.maxTokens.toLocaleString()} tokens)`);
+    });
+    console.log();
 
     // ==========================================
     // STEP 3: ANALYZE & SELECT STRATEGY
@@ -135,16 +123,17 @@ export default async function handler(req, res) {
     
     console.log(`  📈 Complexity: ${analysis.level}`);
     console.log(`  📁 Files needed: ${analysis.filesNeeded}`);
-    console.log(`  📏 Estimated tokens: ${analysis.estimatedTokens}`);
-    console.log(`  📝 Estimated lines: ${analysis.estimatedLines}\n`);
+    console.log(`  📏 Estimated tokens: ${analysis.estimatedTokens.toLocaleString()}`);
+    console.log(`  📝 Estimated lines: ${analysis.estimatedLines.toLocaleString()}\n`);
 
     const strategy = selectOptimalStrategy(providers, analysis);
     
     console.log(`🎯 STEP 4: Selected strategy: ${strategy.name}`);
     console.log(`  🤖 Model: ${strategy.model.name}`);
-    console.log(`  📦 Capacity: ${strategy.model.maxTokens} tokens`);
+    console.log(`  📦 Capacity: ${strategy.model.maxTokens.toLocaleString()} tokens`);
     console.log(`  🎬 Approach: ${strategy.approach}`);
-    console.log(`  🔄 Turns: ${strategy.turns || 1}\n`);
+    console.log(`  🔄 Turns: ${strategy.turns || 1}`);
+    console.log(`  💰 Est. cost: $${strategy.costEstimate.toFixed(6)}\n`);
 
     // ==========================================
     // STEP 5: CREATE ENHANCED PROMPT
@@ -172,7 +161,7 @@ export default async function handler(req, res) {
     const duration = Date.now() - startTime;
     
     console.log(`  ✅ Generation complete in ${duration}ms`);
-    console.log(`  📊 Output: ${result.tokensGenerated} tokens, ${result.linesGenerated} lines`);
+    console.log(`  📊 Output: ${result.tokensGenerated.toLocaleString()} tokens, ${result.linesGenerated.toLocaleString()} lines`);
     console.log(`  💰 Cost: $${result.cost.toFixed(6)}\n`);
 
     // ==========================================
@@ -192,7 +181,8 @@ export default async function handler(req, res) {
         
         if (saved) {
           console.log(`  ✅ Saved to: ${saved.database}`);
-          console.log(`  📦 ID: ${saved.id}\n`);
+          console.log(`  📦 ID: ${saved.id}`);
+          console.log(`  📏 Size: ${saved.size.toFixed(2)} MB\n`);
         }
       } catch (error) {
         console.error('  ⚠️  Auto-save failed (non-critical):', error.message, '\n');
@@ -214,7 +204,7 @@ export default async function handler(req, res) {
       metadata: {
         strategy: strategy.name,
         model: strategy.model.name,
-        modelSource: strategy.model.source || 'client',
+        provider: strategy.model.provider,
         tokensGenerated: result.tokensGenerated,
         linesGenerated: result.linesGenerated,
         confidence: result.confidence,
@@ -236,6 +226,82 @@ export default async function handler(req, res) {
       message: error.message
     });
   }
+}
+
+// ==========================================
+// LOAD PROVIDERS FROM ENVIRONMENT VARIABLES
+// ==========================================
+
+function loadProvidersFromEnv() {
+  const providers = [];
+
+  // Groq (FREE - 32K tokens)
+  if (process.env.GROQ_API_KEY) {
+    providers.push({
+      id: 'groq-llama-3.3',
+      name: 'Groq Llama 3.3 70B',
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
+      apiKey: process.env.GROQ_API_KEY,
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      maxTokens: 32000,
+      costPerToken: 0,
+      speed: 'very-fast',
+      quality: 'high',
+      priority: 1
+    });
+  }
+
+  // Google Gemini (FREE - 2M tokens!)
+  if (process.env.GOOGLE_API_KEY) {
+    providers.push({
+      id: 'google-gemini-1.5-pro',
+      name: 'Google Gemini 1.5 Pro',
+      provider: 'google',
+      model: 'gemini-1.5-pro',
+      apiKey: process.env.GOOGLE_API_KEY,
+      endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
+      maxTokens: 2000000,
+      costPerToken: 0,
+      speed: 'medium',
+      quality: 'very-high',
+      priority: 2
+    });
+  }
+
+  // OpenRouter (PAID - Multiple models)
+  if (process.env.OPENROUTER_API_KEY) {
+    providers.push({
+      id: 'openrouter-gpt4-turbo',
+      name: 'OpenRouter GPT-4 Turbo',
+      provider: 'openrouter',
+      model: 'openai/gpt-4-turbo',
+      apiKey: process.env.OPENROUTER_API_KEY,
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      maxTokens: 128000,
+      costPerToken: 0.00001,
+      speed: 'fast',
+      quality: 'very-high',
+      priority: 3
+    });
+
+    providers.push({
+      id: 'openrouter-claude-3.5',
+      name: 'OpenRouter Claude 3.5 Sonnet',
+      provider: 'openrouter',
+      model: 'anthropic/claude-3.5-sonnet',
+      apiKey: process.env.OPENROUTER_API_KEY,
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      maxTokens: 200000,
+      costPerToken: 0.000003,
+      speed: 'fast',
+      quality: 'excellent',
+      priority: 4
+    });
+  }
+
+  // Sort by priority (lower = higher priority)
+  return providers.sort((a, b) => a.priority - b.priority);
 }
 
 // ==========================================
@@ -275,6 +341,7 @@ async function autoSaveToMemory(question, answer, language, analysis) {
         originalQuestion: question,
         complexity: analysis.level,
         filesCount: analysis.filesNeeded,
+        estimatedTokens: analysis.estimatedTokens,
         source: 'auto-learned',
         learnedAt: new Date()
       }
@@ -313,7 +380,8 @@ function formatMemoryAnswer(knowledge) {
   }
 
   // Add metadata info
-  answer += `\n\n---\n*💡 Retrieved from knowledge base (learned: ${new Date(knowledge.createdAt).toLocaleDateString()})*`;
+  const learnedDate = new Date(knowledge.createdAt).toLocaleDateString();
+  answer += `\n\n---\n*💡 Retrieved from knowledge base • Learned: ${learnedDate} • Database: ${knowledge.source_db}*`;
 
   return answer;
 }
@@ -330,7 +398,7 @@ function calculateSimilarity(str1, str2) {
 }
 
 function extractTags(text) {
-  const keywords = text.toLowerCase().match(/\b(react|vue|angular|node|python|javascript|typescript|java|php|ruby|go|rust|api|database|mongodb|sql|postgresql|mysql|redis|authentication|auth|security|performance|optimization|tutorial|guide|example|component|function|class|hook|state|props|async|await|promise|fetch|axios|express|fastapi|django|flask|spring|laravel|nextjs|vercel|deployment|docker|kubernetes|aws|azure|gcp|frontend|backend|fullstack|html|css|tailwind|bootstrap|testing|jest|cypress|git|github|ci|cd|agile|scrum)\b/g);
+  const keywords = text.toLowerCase().match(/\b(react|vue|angular|node|python|javascript|typescript|java|php|ruby|go|rust|api|database|mongodb|sql|postgresql|mysql|redis|authentication|auth|security|jwt|oauth|performance|optimization|tutorial|guide|example|component|function|class|hook|state|props|async|await|promise|fetch|axios|express|fastapi|django|flask|spring|laravel|nextjs|vercel|deployment|docker|kubernetes|aws|azure|gcp|frontend|backend|fullstack|html|css|tailwind|bootstrap|testing|jest|cypress|git|github|gitlab|ci|cd|devops|agile|scrum|rest|graphql|websocket|microservice|serverless|lambda)\b/g);
   return keywords ? [...new Set(keywords)].slice(0, 15) : [];
 }
 
@@ -349,9 +417,9 @@ function analyzeComplexityDeep(text) {
   
   const comprehensiveKeywords = [
     'lengkap', 'complete', 'full', 'penuh',
-    'seperti', 'like', 'kohl', 'claude', 'sonnet',
+    'seperti', 'like', 'claude', 'sonnet', 'chatgpt',
     'production', 'produksi', 'professional', 'profesional',
-    'system', 'sistem', 'framework'
+    'system', 'sistem', 'framework', 'aplikasi', 'application'
   ];
   const comprehensiveScore = comprehensiveKeywords.filter(k => lowerText.includes(k)).length;
   
@@ -396,54 +464,20 @@ function analyzeComplexityDeep(text) {
 }
 
 // ==========================================
-// PROVIDER ENHANCEMENT
-// ==========================================
-
-function enhanceProviderInfo(provider) {
-  const enhanced = { ...provider };
-  const capabilities = getModelCapabilities(provider.provider, provider.model);
-  
-  enhanced.maxTokens = capabilities.maxTokens;
-  enhanced.costPerToken = capabilities.costPerToken;
-  enhanced.speed = capabilities.speed;
-  enhanced.quality = capabilities.quality;
-  
-  return enhanced;
-}
-
-function getModelCapabilities(provider, model) {
-  const capabilities = {
-    'llama-3.3-70b-versatile': { maxTokens: 32000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
-    'llama-3.1-70b-versatile': { maxTokens: 8000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
-    'gemini-1.5-pro': { maxTokens: 2000000, costPerToken: 0, speed: 'slow', quality: 'very-high' },
-    'gemini-1.5-flash': { maxTokens: 1000000, costPerToken: 0, speed: 'medium', quality: 'high' },
-    'openai/gpt-4-turbo': { maxTokens: 128000, costPerToken: 0.00001, speed: 'fast', quality: 'very-high' },
-    'anthropic/claude-3.5-sonnet': { maxTokens: 200000, costPerToken: 0.000003, speed: 'fast', quality: 'excellent' }
-  };
-  
-  if (capabilities[model]) return capabilities[model];
-  
-  const defaults = {
-    'groq': { maxTokens: 8000, costPerToken: 0, speed: 'very-fast', quality: 'high' },
-    'openrouter': { maxTokens: 8000, costPerToken: 0.000001, speed: 'medium', quality: 'high' },
-    'google': { maxTokens: 32000, costPerToken: 0, speed: 'medium', quality: 'high' }
-  };
-  
-  return defaults[provider] || { maxTokens: 4096, costPerToken: 0.000001, speed: 'medium', quality: 'medium' };
-}
-
-// ==========================================
 // STRATEGY SELECTION
 // ==========================================
 
 function selectOptimalStrategy(providers, analysis) {
   const tokensNeeded = analysis.estimatedTokens;
+  
+  // Sort: FREE first, then by capacity
   const sortedProviders = providers.sort((a, b) => {
     if (a.costPerToken === 0 && b.costPerToken > 0) return -1;
     if (a.costPerToken > 0 && b.costPerToken === 0) return 1;
     return b.maxTokens - a.maxTokens;
   });
   
+  // Try single-turn with high-capacity model
   const singleTurnModel = sortedProviders.find(p => p.maxTokens >= tokensNeeded * 1.2);
   
   if (singleTurnModel) {
@@ -456,6 +490,7 @@ function selectOptimalStrategy(providers, analysis) {
     };
   }
   
+  // Fallback: multi-turn with best available model
   const bestModel = sortedProviders[0];
   const turns = Math.ceil(tokensNeeded / (bestModel.maxTokens * 0.9));
   
@@ -501,11 +536,13 @@ async function executeMultiTurn(strategy, messages) {
   const parts = [];
   
   for (let turn = 0; turn < strategy.turns; turn++) {
+    console.log(`    🔄 Turn ${turn + 1}/${strategy.turns}...`);
+    
     const turnPrompt = {
       role: 'user',
       content: turn === 0 ? 
         originalPrompt + `\n\n[Generate first part completely]` :
-        `Continue from previous. Generate next part.\n\n${parts[parts.length - 1].substring(parts[parts.length - 1].length - 500)}`
+        `Continue from previous. Generate next part completely.\n\nPrevious output:\n${parts[parts.length - 1].substring(parts[parts.length - 1].length - 500)}\n\n[Continue and complete remaining content]`
     };
     
     const turnMessages = systemPrompt ? [systemPrompt, turnPrompt] : [turnPrompt];
@@ -514,10 +551,14 @@ async function executeMultiTurn(strategy, messages) {
       const result = await queryAIProvider(strategy.model, turnMessages);
       parts.push(result.answer);
       
+      console.log(`       ✓ Generated ${estimateTokens(result.answer).toLocaleString()} tokens`);
+      
       if (detectCompleteness(result.answer) && turn < strategy.turns - 1) {
+        console.log(`       ℹ️  Generation complete, stopping early`);
         break;
       }
     } catch (error) {
+      console.error(`       ✗ Turn failed: ${error.message}`);
       if (parts.length === 0) throw error;
       break;
     }
@@ -538,7 +579,7 @@ async function executeMultiTurn(strategy, messages) {
 }
 
 function detectCompleteness(text) {
-  const markers = ['setup instructions', 'usage example', 'selesai', 'demikian'];
+  const markers = ['setup instructions', 'usage example', 'installation', 'selesai', 'demikian', 'conclusion'];
   const lowerText = text.toLowerCase();
   const hasMarkers = markers.filter(m => lowerText.includes(m)).length >= 2;
   const codeBlocks = (text.match(/```/g) || []).length / 2;
@@ -554,13 +595,35 @@ function createUltimatePrompt(messages, userLanguage, analysis, strategy) {
   
   const prompt = {
     role: 'system',
-    content: `You are Claude Sonnet 4.5 - advanced coding assistant.
+    content: `You are an expert coding assistant. Generate COMPLETE, PRODUCTION-READY code.
 
-Target: ${analysis.filesNeeded} files, ${analysis.estimatedLines} lines, ${analysis.estimatedTokens} tokens
+📊 Target Output:
+- Files: ${analysis.filesNeeded}
+- Lines: ${analysis.estimatedLines}
+- Tokens: ${analysis.estimatedTokens}
 
-${isIndonesian ? 'ATURAN: Generate LENGKAP, NO placeholders, ALL functions implemented!' : 'RULES: Generate COMPLETE, NO placeholders, ALL functions implemented!'}
+⚡ Critical Rules:
+${isIndonesian ? `
+- Generate LENGKAP tanpa placeholder
+- SEMUA fungsi fully implemented
+- Include error handling lengkap
+- Add dokumentasi dalam Bahasa Indonesia
+- Code siap production, bukan contoh!
+` : `
+- Generate COMPLETE without placeholders
+- ALL functions fully implemented
+- Include complete error handling
+- Add comprehensive documentation
+- Production-ready code, not examples!
+`}
 
-USE FULL CAPACITY!`
+🎯 Quality Standards:
+- Best practices
+- Clean code
+- Security conscious
+- Performance optimized
+
+USE FULL CAPACITY! Generate ${analysis.estimatedLines}+ lines!`
   };
   
   return [prompt, ...messages];
@@ -582,7 +645,7 @@ async function queryAIProvider(provider, messages) {
   
   const headers = buildHeaders(provider);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180000);
+  const timeout = setTimeout(() => controller.abort(), 180000); // 3 minutes
 
   try {
     const response = await fetch(provider.endpoint, {
@@ -596,20 +659,22 @@ async function queryAIProvider(provider, messages) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`${provider.name} error ${response.status}: ${errorText.substring(0, 200)}`);
+      throw new Error(`${provider.name} API error ${response.status}: ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json();
     const answer = extractAnswer(provider, data);
 
     if (!answer || answer.trim().length === 0) {
-      throw new Error('Empty response');
+      throw new Error('Empty response from AI');
     }
 
     return { answer: answer.trim() };
   } catch (error) {
     clearTimeout(timeout);
-    if (error.name === 'AbortError') throw new Error('Timeout after 3 minutes');
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout after 3 minutes');
+    }
     throw error;
   }
 }
@@ -619,7 +684,7 @@ async function queryAIProvider(provider, messages) {
 // ==========================================
 
 function detectLanguage(text) {
-  const indonesianWords = ['apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'dengan', 'untuk'];
+  const indonesianWords = ['apa', 'bagaimana', 'buat', 'buatkan', 'tolong', 'saya', 'dengan', 'untuk', 'yang', 'ini'];
   const lowerText = text.toLowerCase();
   const count = indonesianWords.filter(w => lowerText.includes(w)).length;
   return count >= 2 ? 'indonesian' : 'english';
@@ -637,8 +702,8 @@ function buildHeaders(provider) {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
   } else if (providerType === 'openrouter') {
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
-    headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://next-gen-ai.vercel.app/';
-    headers['X-Title'] = 'NextGenAI';
+    headers['HTTP-Referer'] = process.env.VERCEL_URL || 'https://nextgenai.vercel.app/';
+    headers['X-Title'] = 'NextGenAI Memory System';
   } else if (providerType === 'google') {
     headers['x-goog-api-key'] = provider.apiKey;
   }
