@@ -1,1017 +1,194 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Panel - AI Configuration</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
-  
-  <!-- Admin Panel -->
-  <div id="adminPanel" class="p-6">
-    <div class="max-w-6xl mx-auto">
-      
-      <!-- Header -->
-      <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <span class="text-2xl">⚙️</span>
-            </div>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-800">Admin Panel</h1>
-              <p class="text-sm text-gray-500">Configure AI Learning Sources</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <!-- Admin Info -->
-            <div id="adminInfo" class="px-4 py-2 bg-blue-50 rounded-lg text-sm">
-              <div class="font-semibold text-blue-900" id="adminName">Loading...</div>
-              <div class="text-blue-600 text-xs" id="adminEmail"></div>
-            </div>
-            <button onclick="saveAllConfig()" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-              💾 Save All
-            </button>
-            <button onclick="window.location.href='/'" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
-              🏠 Home
-            </button>
-            <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
-              🚪 Logout
-            </button>
-          </div>
-        </div>
+<!-- Replace the AI Providers section in your admin.html with this -->
 
-        <!-- Stats -->
-        <div class="grid grid-cols-4 gap-4 mt-6">
-          <div class="bg-blue-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-blue-600" id="totalSources">0</div>
-            <div class="text-sm text-gray-600">Total AI Sources</div>
-          </div>
-          <div class="bg-green-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-green-600" id="activeSources">0</div>
-            <div class="text-sm text-gray-600">Active & Ready</div>
-          </div>
-          <div class="bg-amber-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-amber-600" id="pendingSources">0</div>
-            <div class="text-sm text-gray-600">Need API Key</div>
-          </div>
-          <div class="bg-purple-50 rounded-lg p-4">
-            <div class="text-2xl font-bold text-purple-600" id="providers">0</div>
-            <div class="text-sm text-gray-600">Providers</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Info Banner -->
-      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
-        <div class="flex items-start gap-3">
-          <span class="text-2xl">💡</span>
-          <div class="text-sm text-blue-800">
-            <strong>Cara Kerja:</strong> AI Anda akan belajar dari semua AI sources yang aktif di bawah ini. 
-            Minimal butuh 1 API key (Groq recommended - gratis!). Makin banyak AI sources, makin pintar hasil pembelajaran!
-          </div>
-        </div>
-      </div>
-
-        <!-- Environment Status -->
-      <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-bold text-gray-800">🔧 Environment Configuration</h2>
-          <div class="flex gap-2">
-            <button onclick="copyEnvTemplate()" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm">
-              📋 Copy .env Template
-            </button>
-            <button onclick="loadEnvStatus()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
-              🔄 Refresh
-            </button>
-          </div>
-        </div>
-        
-        <div id="envStatus" class="space-y-4">
-          <div class="text-center text-gray-500 py-8">
-            Loading environment status...
-          </div>
-        </div>
-      </div>
-
-      <!-- AI Sources Configuration -->
-      <div id="sourcesList" class="space-y-4">
-        <!-- Will be populated by JS -->
-      </div>
-
-      <!-- Add Custom Source -->
-      <button onclick="showAddForm()" class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-gray-600 hover:text-blue-600 font-medium">
-        ➕ Add Custom AI Source
-      </button>
-
-      <!-- Add Form Modal -->
-      <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
-        <div class="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <h2 class="text-xl font-bold mb-4">Add Custom AI Source</h2>
-          
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium mb-2">Source Name</label>
-              <input type="text" id="customName" placeholder="My Custom AI" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">Provider Type</label>
-              <select id="customProvider" class="w-full px-3 py-2 border rounded-lg">
-                <option value="openai">OpenAI Compatible</option>
-                <option value="anthropic">Anthropic (Claude)</option>
-                <option value="custom">Custom API</option>
-              </select>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">API Endpoint</label>
-              <input type="text" id="customEndpoint" placeholder="https://api.example.com/v1/chat/completions" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">Model Name</label>
-              <input type="text" id="customModel" placeholder="gpt-4" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">API Key</label>
-              <input type="password" id="customApiKey" placeholder="sk-..." class="w-full px-3 py-2 border rounded-lg">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium mb-2">Priority (1-10, lower = higher)</label>
-              <input type="number" id="customPriority" value="5" min="1" max="10" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-          </div>
-          
-          <div class="flex gap-2 mt-6">
-            <button onclick="closeAddForm()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">
-              Cancel
-            </button>
-            <button onclick="addCustomSource()" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-              Add Source
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Instructions -->
-      <div class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6 mt-6">
-        <h3 class="text-lg font-bold text-purple-900 mb-3">📚 Cara Mendapatkan API Keys (Semua Gratis!)</h3>
-        <div class="space-y-3 text-sm text-purple-800">
-          <div>
-            <strong>1. Groq (Recommended):</strong>
-            <ul class="list-disc ml-5 mt-1">
-              <li>Buka: <a href="https://console.groq.com/" target="_blank" class="underline">console.groq.com</a></li>
-              <li>Login dengan Google → API Keys → Create API Key</li>
-              <li>Gratis unlimited! Model terbaru & tercepat</li>
-            </ul>
-          </div>
-          
-          <div>
-            <strong>2. OpenRouter (Multi-Model):</strong>
-            <ul class="list-disc ml-5 mt-1">
-              <li>Buka: <a href="https://openrouter.ai/" target="_blank" class="underline">openrouter.ai</a></li>
-              <li>Login → Keys → Create Key</li>
-              <li>Akses ke GPT-4, Claude, Gemini, dll dalam 1 API!</li>
-            </ul>
-          </div>
-          
-          <div>
-            <strong>3. HuggingFace (Open Source):</strong>
-            <ul class="list-disc ml-5 mt-1">
-              <li>Buka: <a href="https://huggingface.co/settings/tokens" target="_blank" class="underline">huggingface.co/settings/tokens</a></li>
-              <li>Create token → Role: Read</li>
-              <li>Gratis, banyak model open source</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-    </div>
+<div class="bg-gray-50 rounded-lg p-4">
+  <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+    🤖 AI Providers
+  </h3>
+  <div class="space-y-3" id="aiProvidersContainer">
+    <div class="text-center text-gray-500 py-4">Loading...</div>
   </div>
+</div>
 
-  <script>
-    const API_BASE = window.location.origin;
+<script>
+// Function to render AI providers with test buttons
+function renderAIProviders(aiProviders) {
+  const container = document.getElementById('aiProvidersContainer');
+  
+  if (!aiProviders) {
+    container.innerHTML = '<div class="text-red-500">Failed to load AI providers</div>';
+    return;
+  }
 
-    // ==========================================
-    // AUTHENTICATION CHECK - SIMPLIFIED VERSION
-    // ==========================================
-    (async function checkAuth() {
-      const token = localStorage.getItem('admin_token');
-      
-      if (!token) {
-        window.location.href = '/login.html';
-        return;
-      }
+  const providersHTML = Object.entries(aiProviders).map(([name, provider]) => {
+    const isConfigured = provider.configured;
+    const statusColor = isConfigured ? 'green' : 'gray';
+    const statusIcon = isConfigured ? '✅' : '❌';
 
-      // Skip token verification for simple version
-      console.log('✅ Logged in with token:', token);
+    return `
+      <div class="flex items-center justify-between p-3 bg-white rounded-lg border ${isConfigured ? 'border-green-200' : 'border-gray-200'}">
+        <div class="flex items-center gap-3 flex-1">
+          <div class="w-10 h-10 rounded-lg bg-${statusColor}-100 flex items-center justify-center">
+            <span class="text-xl">${statusIcon}</span>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold text-gray-900 capitalize flex items-center gap-2">
+              ${name}
+              ${isConfigured ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Configured</span>' : '<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not configured</span>'}
+            </div>
+            <div class="text-xs text-gray-500">${provider.models.join(', ')}</div>
+            ${provider.key ? `
+              <div class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded mt-1 inline-block">
+                ${provider.key}
+              </div>
+            ` : ''}
+            ${provider.tested ? `
+              <div class="text-xs mt-1 ${provider.status === 'working' ? 'text-green-600' : 'text-red-600'}">
+                Test result: ${provider.status === 'working' ? '✅ Working!' : '❌ Failed'}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+        ${isConfigured ? `
+          <button 
+            onclick="testAPIKey('${name}')" 
+            id="test-btn-${name}"
+            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex items-center gap-2 transition-all"
+          >
+            <span>🧪</span> Test
+          </button>
+        ` : `
+          <a 
+            href="https://vercel.com/gutamas-projects-c4579180/next-gen-ai/settings/environment-variables" 
+            target="_blank"
+            class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm"
+          >
+            Add API Key
+          </a>
+        `}
+      </div>
+    `;
+  }).join('');
 
-      // Display admin info
-      const email = localStorage.getItem('admin_email') || 'admin@nextgenai.com';
-      const name = localStorage.getItem('admin_name') || 'Admin';
-      
-      document.getElementById('adminName').textContent = name;
-      document.getElementById('adminEmail').textContent = email;
-      
-      // Load sources and env status
-      loadSources();
-      loadEnvStatus();
-    })();
+  container.innerHTML = providersHTML;
+}
 
-    // ==========================================
-    // AUTHENTICATED FETCH WRAPPER
-    // ==========================================
-    async function adminFetch(url, options = {}) {
-      const token = localStorage.getItem('admin_token');
-      
-      if (!token) {
-        window.location.href = '/login.html';
-        return;
-      }
+// Function to test API key
+async function testAPIKey(provider) {
+  const btn = document.getElementById(`test-btn-${provider}`);
+  const originalHTML = btn.innerHTML;
+  
+  // Show loading
+  btn.innerHTML = '<span class="animate-spin inline-block">⏳</span> Testing...';
+  btn.disabled = true;
 
-      const headers = {
-        ...options.headers,
-        'Authorization': `Bearer ${token}`,
+  try {
+    const response = await fetch(`${API_BASE}/api/admin/env-status`, {
+      method: 'POST',
+      headers: {
         'Content-Type': 'application/json'
-      };
-
-      try {
-        const response = await fetch(url, { ...options, headers });
-        
-        if (response.status === 401) {
-          localStorage.clear();
-          window.location.href = '/login.html';
-          return;
-        }
-
-        return response;
-      } catch (error) {
-        console.error('Admin API error:', error);
-        throw error;
-      }
-    }
-
-    // ==========================================
-    // DEFAULT AI SOURCES
-    // ==========================================
-    const defaultSources = [
-      {
-        id: 'groq-llama-3.3',
-        name: 'Groq (Llama 3.3 70B)',
-        provider: 'groq',
-        model: 'llama-3.3-70b-versatile',
-        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-        apiKey: '',
-        priority: 1,
-        enabled: true,
-        isDefault: true,
-        description: '✨ Terbaru! Super cepat, gratis unlimited. RECOMMENDED!'
       },
-      {
-        id: 'groq-llama-3.1',
-        name: 'Groq (Llama 3.1 70B)',
-        provider: 'groq',
-        model: 'llama-3.1-70b-versatile',
-        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-        apiKey: '',
-        priority: 2,
-        enabled: true,
-        isDefault: true,
-        description: 'Backup stabil, gratis unlimited'
-      },
-      {
-        id: 'openrouter-gpt',
-        name: 'OpenRouter (GPT-3.5 Turbo)',
-        provider: 'openrouter',
-        model: 'openai/gpt-3.5-turbo',
-        endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-        apiKey: '',
-        priority: 3,
-        enabled: false,
-        isDefault: true,
-        description: 'Free tier available, quality bagus'
-      },
-      {
-        id: 'openrouter-claude',
-        name: 'OpenRouter (Claude 3 Haiku)',
-        provider: 'openrouter',
-        model: 'anthropic/claude-3-haiku',
-        endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-        apiKey: '',
-        priority: 4,
-        enabled: false,
-        isDefault: true,
-        description: 'Excellent reasoning, free tier'
-      },
-      {
-        id: 'huggingface-mistral',
-        name: 'HuggingFace (Mistral 7B)',
-        provider: 'huggingface',
-        model: 'mistralai/Mistral-7B-Instruct-v0.2',
-        endpoint: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
-        apiKey: '',
-        priority: 5,
-        enabled: false,
-        isDefault: true,
-        description: 'Open source, gratis'
-      }
-    ];
+      body: JSON.stringify({ provider })
+    });
 
-    let sources = [];
+    const result = await response.json();
 
-    // ==========================================
-    // LOAD ENVIRONMENT STATUS
-    // ==========================================
-    async function loadEnvStatus() {
-      const container = document.getElementById('envStatus');
+    if (result.success) {
+      // Show success
+      btn.innerHTML = '<span>✅</span> Working!';
+      btn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+      btn.classList.add('bg-green-500', 'hover:bg-green-600');
       
-      try {
-        container.innerHTML = `
-          <div class="text-center text-gray-500 py-8">
-            <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-2"></div>
-            <p>Loading environment status...</p>
-          </div>
-        `;
-
-        // Fix: Ensure correct URL without trailing characters
-        const apiUrl = `${API_BASE}/api/admin/env-status`;
-        console.log('Fetching env status from:', apiUrl);
-        
-        const response = await adminFetch(apiUrl);
-        
-        if (!response) {
-          throw new Error('No response from server');
-        }
-
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          const text = await response.text();
-          console.error('Non-JSON response:', text.substring(0, 200));
-          throw new Error('Server returned non-JSON response. API endpoint may not exist.');
-        }
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to load environment status');
-        }
-        
-        renderEnvStatus(data);
-        
-      } catch (error) {
-        console.error('Failed to load env status:', error);
-        container.innerHTML = `
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div class="flex items-start gap-3">
-              <span class="text-2xl">❌</span>
-              <div class="flex-1">
-                <h3 class="font-bold text-red-900 mb-2">Failed to Load Environment Status</h3>
-                <p class="text-sm text-red-700 mb-3">${error.message}</p>
-                <div class="bg-white rounded p-3 text-xs font-mono text-gray-600 mb-3">
-                  <strong>Possible causes:</strong><br>
-                  • API file not created: <code>api/admin/env-status.js</code><br>
-                  • File not deployed to Vercel yet<br>
-                  • Server error or invalid response<br>
-                  • Authorization token expired
-                </div>
-                <div class="flex gap-2">
-                  <button onclick="loadEnvStatus()" class="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
-                    🔄 Retry
-                  </button>
-                  <button onclick="showEnvSetupHelp()" class="px-3 py-2 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">
-                    📚 Setup Help
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }
+      alert(`✅ ${provider.toUpperCase()} API Test Success!\n\n${result.message}\n\nModel: ${result.model}`);
+    } else {
+      // Show error
+      btn.innerHTML = '<span>❌</span> Failed';
+      btn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+      btn.classList.add('bg-red-500', 'hover:bg-red-600');
+      
+      alert(`❌ ${provider.toUpperCase()} API Test Failed!\n\nError: ${result.error}\n\nPlease check:\n1. API key is correct\n2. API key has sufficient credits\n3. API endpoint is accessible`);
     }
 
-    function showEnvSetupHelp() {
-      const help = `
-==============================================
-SETUP ENVIRONMENT MONITOR
-==============================================
+    // Reset button after 3 seconds
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+      btn.classList.remove('bg-green-500', 'hover:bg-green-600', 'bg-red-500', 'hover:bg-red-600');
+      btn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+    }, 3000);
 
-1. CREATE API FILE
-   Create file: api/admin/env-status.js
-   Copy code from the artifact provided
+  } catch (error) {
+    console.error('Test error:', error);
+    btn.innerHTML = '<span>❌</span> Error';
+    btn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+    btn.classList.add('bg-red-500', 'hover:bg-red-600');
+    
+    alert(`❌ Test Error!\n\n${error.message}`);
 
-2. DEPLOY TO VERCEL
-   git add api/admin/env-status.js
-   git commit -m "Add env monitor API"
-   git push
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+      btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+      btn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+    }, 3000);
+  }
+}
 
-3. WAIT FOR DEPLOYMENT
-   Wait 30-60 seconds for Vercel to deploy
+// Update the loadEnvStatus function to call renderAIProviders
+async function loadEnvStatus() {
+  const container = document.getElementById('envStatus');
+  
+  try {
+    container.innerHTML = `
+      <div class="text-center text-gray-500 py-8">
+        <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-2"></div>
+        <p>Loading environment status...</p>
+      </div>
+    `;
 
-4. REFRESH THIS PAGE
-   Click the Refresh button above
-
-==============================================
-TROUBLESHOOTING
-==============================================
-
-Error: "API endpoint may not exist"
-→ File api/admin/env-status.js not created
-→ File not deployed to Vercel yet
-
-Error: "Authorization token expired"
-→ Logout and login again
-→ Token may be invalid
-
-Error: "Server returned non-JSON"
-→ Check Vercel deployment logs
-→ API file may have syntax error
-
-==============================================
-      `;
-      
-      alert(help);
+    const apiUrl = `${API_BASE}/api/admin/env-status`;
+    console.log('Fetching env status from:', apiUrl);
+    
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    function renderEnvStatus(data) {
-      const container = document.getElementById('envStatus');
-      
-      const { status, auth, aiProviders, databases, storage, deployment } = data;
-      
-      // Overall Status
-      const statusColor = status.overall === 'healthy' ? 'green' : 'amber';
-      const statusIcon = status.overall === 'healthy' ? '✅' : '⚠️';
-      
-      let html = `
-        <!-- Overall Status -->
-        <div class="bg-${statusColor}-50 border-l-4 border-${statusColor}-500 p-4 rounded-lg">
-          <div class="flex items-start gap-3">
-            <span class="text-2xl">${statusIcon}</span>
-            <div class="flex-1">
-              <h3 class="font-bold text-${statusColor}-900">System Status: ${status.overall === 'healthy' ? 'Healthy' : 'Needs Attention'}</h3>
-              ${status.warnings.length > 0 ? `
-                <ul class="mt-2 text-sm text-${statusColor}-700 space-y-1">
-                  ${status.warnings.map(w => `<li>• ${w}</li>`).join('')}
-                </ul>
-              ` : '<p class="text-sm text-green-700 mt-1">All systems operational</p>'}
-            </div>
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Non-JSON response:', text.substring(0, 200));
+      throw new Error('Server returned non-JSON response');
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to load environment status');
+    }
+    
+    // Render the full status (existing renderEnvStatus function)
+    renderEnvStatus(data);
+    
+    // Also render AI providers section separately
+    renderAIProviders(data.aiProviders);
+    
+  } catch (error) {
+    console.error('Failed to load env status:', error);
+    container.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div class="flex items-start gap-3">
+          <span class="text-2xl">❌</span>
+          <div class="flex-1">
+            <h3 class="font-bold text-red-900 mb-2">Failed to Load Environment Status</h3>
+            <p class="text-sm text-red-700 mb-3">${error.message}</p>
+            <button onclick="loadEnvStatus()" class="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+              🔄 Retry
+            </button>
           </div>
         </div>
-
-        <!-- Quick Stats -->
-        <div class="grid grid-cols-4 gap-4">
-          <div class="bg-blue-50 rounded-lg p-4 text-center">
-            <div class="text-3xl mb-2">${status.hasAuth ? '✅' : '❌'}</div>
-            <div class="font-semibold text-blue-900">Authentication</div>
-            <div class="text-xs text-blue-600 mt-1">${auth.adminEmails} admin(s)</div>
-          </div>
-          <div class="bg-purple-50 rounded-lg p-4 text-center">
-            <div class="text-3xl mb-2">${status.hasAI ? '✅' : '❌'}</div>
-            <div class="font-semibold text-purple-900">AI Providers</div>
-            <div class="text-xs text-purple-600 mt-1">${Object.values(aiProviders).filter(p => p.configured).length} active</div>
-          </div>
-          <div class="bg-green-50 rounded-lg p-4 text-center">
-            <div class="text-3xl mb-2">${status.hasStorage ? '✅' : '⚠️'}</div>
-            <div class="font-semibold text-green-900">Databases</div>
-            <div class="text-xs text-green-600 mt-1">${storage.total} MB total</div>
-          </div>
-          <div class="bg-amber-50 rounded-lg p-4 text-center">
-            <div class="text-3xl mb-2">${deployment.isProduction ? '🚀' : '🔧'}</div>
-            <div class="font-semibold text-amber-900">Deployment</div>
-            <div class="text-xs text-amber-600 mt-1">${deployment.nodeEnv}</div>
-          </div>
-        </div>
-
-        <!-- Authentication Details -->
-        <div class="bg-gray-50 rounded-lg p-4">
-          <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            🔐 Authentication Config
-          </h3>
-          <div class="grid grid-cols-2 gap-3 text-sm">
-            <div class="flex justify-between">
-              <span class="text-gray-600">Admin Emails:</span>
-              <span class="font-mono font-semibold">${auth.adminEmails}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-600">Password Set:</span>
-              <span class="font-mono font-semibold">${auth.adminPassword ? '✅' : '❌'}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-600">JWT Secret:</span>
-              <span class="font-mono font-semibold">${auth.jwtSecret ? '✅' : '❌'}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-600">Secret Length:</span>
-              <span class="font-mono font-semibold ${auth.isSecure ? 'text-green-600' : 'text-red-600'}">${auth.jwtSecretLength} chars ${auth.isSecure ? '✅' : '⚠️'}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- AI Providers Details -->
-        <div class="bg-gray-50 rounded-lg p-4">
-          <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            🤖 AI Providers
-          </h3>
-          <div class="space-y-3">
-            ${Object.entries(aiProviders).map(([name, provider]) => `
-              <div class="flex items-center justify-between p-3 bg-white rounded-lg">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-lg ${provider.configured ? 'bg-green-100' : 'bg-gray-100'} flex items-center justify-center">
-                    <span class="text-xl">${provider.configured ? '✅' : '❌'}</span>
-                  </div>
-                  <div>
-                    <div class="font-semibold text-gray-900 capitalize">${name}</div>
-                    <div class="text-xs text-gray-500">${provider.models.join(', ')}</div>
-                  </div>
-                </div>
-                ${provider.configured ? `
-                  <div class="text-xs font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded">
-                    ${provider.key}
-                  </div>
-                ` : `
-                  <span class="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded">Not configured</span>
-                `}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Database Details -->
-        <div class="bg-gray-50 rounded-lg p-4">
-          <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            💾 Database Configuration
-          </h3>
-          
-          <!-- Storage Summary -->
-          <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-4">
-            <div class="text-center">
-              <div class="text-3xl font-bold text-purple-600">${storage.total} MB</div>
-              <div class="text-sm text-gray-600">Total Free Storage Available</div>
-              <div class="text-xs text-gray-500 mt-2">
-                MongoDB: ${storage.mongodb.total} MB • 
-                Supabase: ${storage.supabase.total} MB • 
-                Vercel KV: ${storage.vercelKV.capacity} MB
-              </div>
-            </div>
-          </div>
-
-          <!-- MongoDB -->
-          ${databases.mongodb.length > 0 ? `
-            <div class="mb-4">
-              <h4 class="font-semibold text-gray-800 mb-2">📦 MongoDB Databases (${databases.mongodb.length}/10)</h4>
-              <div class="space-y-2">
-                ${databases.mongodb.map(db => `
-                  <div class="flex items-center justify-between p-2 bg-white rounded text-sm">
-                    <div class="flex items-center gap-2">
-                      <span class="text-green-500">✓</span>
-                      <span class="font-semibold">${db.name}</span>
-                      <span class="text-gray-500">→</span>
-                      <span class="text-gray-600">${db.database}</span>
-                    </div>
-                    <span class="text-xs font-mono text-gray-500">${db.uri}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : '<div class="text-sm text-gray-500 mb-4">No MongoDB configured</div>'}
-
-          <!-- Supabase -->
-          ${databases.supabase.length > 0 ? `
-            <div class="mb-4">
-              <h4 class="font-semibold text-gray-800 mb-2">🗄️ Supabase Databases (${databases.supabase.length}/5)</h4>
-              <div class="space-y-2">
-                ${databases.supabase.map(db => `
-                  <div class="flex items-center justify-between p-2 bg-white rounded text-sm">
-                    <div class="flex items-center gap-2">
-                      <span class="text-green-500">✓</span>
-                      <span class="font-semibold">${db.name}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-xs text-gray-500">${db.url}</span>
-                      <span class="text-xs font-mono text-gray-500">${db.key}</span>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : '<div class="text-sm text-gray-500 mb-4">No Supabase configured</div>'}
-
-          <!-- Vercel KV -->
-          <div>
-            <h4 class="font-semibold text-gray-800 mb-2">⚡ Vercel KV</h4>
-            <div class="p-2 bg-white rounded text-sm">
-              ${databases.vercelKV.configured ? `
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="text-green-500">✓</span>
-                    <span class="font-semibold">Configured</span>
-                  </div>
-                  <span class="text-xs font-mono text-gray-500">${databases.vercelKV.token}</span>
-                </div>
-              ` : '<span class="text-gray-500">Not configured</span>'}
-            </div>
-          </div>
-        </div>
-
-        <!-- Deployment Info -->
-        ${deployment.vercelUrl ? `
-          <div class="bg-gray-50 rounded-lg p-4">
-            <h3 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
-              🚀 Deployment Info
-            </h3>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-gray-600">Vercel URL:</span>
-                <a href="https://${deployment.vercelUrl}" target="_blank" class="text-blue-600 hover:underline font-mono">${deployment.vercelUrl}</a>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Environment:</span>
-                <span class="font-mono font-semibold ${deployment.isProduction ? 'text-green-600' : 'text-amber-600'}">${deployment.nodeEnv}</span>
-              </div>
-            </div>
-          </div>
-        ` : ''}
-      `;
-      
-      container.innerHTML = html;
-    }
-
-    // ==========================================
-    // LOAD SOURCES FROM SERVER
-    // ==========================================
-    async function loadSources() {
-      try {
-        const response = await adminFetch(`${API_BASE}/api/admin/sources`);
-        if (!response) return;
-        
-        const data = await response.json();
-        
-        if (data.sources && data.sources.length > 0) {
-          sources = data.sources;
-        } else {
-          // Use default sources if no saved config
-          sources = [...defaultSources];
-        }
-        
-        renderSources();
-        updateStats();
-      } catch (error) {
-        console.error('Failed to load sources:', error);
-        // Fallback to localStorage
-        const saved = localStorage.getItem('ai_sources');
-        if (saved) {
-          sources = JSON.parse(saved);
-        } else {
-          sources = [...defaultSources];
-        }
-        renderSources();
-        updateStats();
-      }
-    }
-
-    // ==========================================
-    // SAVE SOURCES TO SERVER
-    // ==========================================
-    async function saveSources() {
-      try {
-        // Save to server
-        const response = await adminFetch(`${API_BASE}/api/admin/sources`, {
-          method: 'POST',
-          body: JSON.stringify({ sources })
-        });
-        
-        if (response) {
-          const data = await response.json();
-          console.log('✅ Sources saved:', data);
-        }
-        
-        // Also save to localStorage as backup
-        localStorage.setItem('ai_sources', JSON.stringify(sources));
-        
-      } catch (error) {
-        console.error('Failed to save sources:', error);
-        // Fallback to localStorage only
-        localStorage.setItem('ai_sources', JSON.stringify(sources));
-      }
-    }
-
-    // ==========================================
-    // RENDER SOURCES
-    // ==========================================
-    function renderSources() {
-      const container = document.getElementById('sourcesList');
-      container.innerHTML = sources.map(source => {
-        const hasApiKey = source.apiKey && source.apiKey.length > 0;
-        const isActive = hasApiKey && source.enabled;
-        
-        return `
-          <div class="bg-white rounded-xl shadow-md p-6 ${!source.enabled || !hasApiKey ? 'opacity-75' : ''}">
-            <div class="flex items-start justify-between gap-4">
-              
-              <div class="flex items-start gap-4 flex-1">
-                <label class="relative inline-flex items-center cursor-pointer mt-1">
-                  <input type="checkbox" ${source.enabled ? 'checked' : ''} 
-                         onchange="toggleSource('${source.id}')" 
-                         ${!hasApiKey ? 'disabled' : ''}
-                         class="sr-only peer">
-                  <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${!hasApiKey ? 'opacity-50 cursor-not-allowed' : ''}"></div>
-                </label>
-
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-2">
-                    <h3 class="text-lg font-bold text-gray-800">${source.name}</h3>
-                    ${isActive ? '<span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">✓ Active</span>' : ''}
-                    ${!hasApiKey ? '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">⚠ Need API Key</span>' : ''}
-                  </div>
-                  
-                  <p class="text-sm text-gray-600 mb-3">${source.description || ''}</p>
-                  
-                  <div class="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
-                    <span>🏷️ ${source.provider}</span>
-                    <span>🧠 ${source.model}</span>
-                    <span>⚡ Priority: ${source.priority}</span>
-                  </div>
-
-                  <div class="flex gap-2">
-                    <input
-                      type="password"
-                      id="apikey-${source.id}"
-                      value="${source.apiKey || ''}"
-                      placeholder="${getApiKeyPlaceholder(source.provider)}"
-                      onchange="updateApiKey('${source.id}', this.value)"
-                      class="flex-1 px-3 py-2 text-sm border ${hasApiKey ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'} rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button onclick="toggleShowApiKey('${source.id}')" class="px-3 py-2 border rounded-lg hover:bg-gray-50">
-                      👁️
-                    </button>
-                    ${hasApiKey ? `<button onclick="testSource('${source.id}')" class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">Test</button>` : ''}
-                  </div>
-                </div>
-              </div>
-
-              <div class="flex flex-col gap-2">
-                ${!source.isDefault ? `
-                  <button onclick="deleteSource('${source.id}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
-                    🗑️
-                  </button>
-                ` : ''}
-                <button onclick="changePriority('${source.id}')" class="p-2 text-gray-600 hover:bg-gray-50 rounded-lg" title="Change Priority">
-                  🔢
-                </button>
-              </div>
-              
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function getApiKeyPlaceholder(provider) {
-      const placeholders = {
-        'groq': 'gsk_...',
-        'openrouter': 'sk-or-...',
-        'huggingface': 'hf_...',
-        'openai': 'sk-...',
-        'anthropic': 'sk-ant-...'
-      };
-      return placeholders[provider] || 'API Key...';
-    }
-
-    function updateStats() {
-      const active = sources.filter(s => s.enabled && s.apiKey).length;
-      const pending = sources.filter(s => !s.apiKey).length;
-      
-      document.getElementById('totalSources').textContent = sources.length;
-      document.getElementById('activeSources').textContent = active;
-      document.getElementById('pendingSources').textContent = pending;
-      document.getElementById('providers').textContent = new Set(sources.map(s => s.provider)).size;
-    }
-
-    function toggleSource(id) {
-      const source = sources.find(s => s.id === id);
-      if (source) {
-        source.enabled = !source.enabled;
-        renderSources();
-        updateStats();
-      }
-    }
-
-    function updateApiKey(id, key) {
-      const source = sources.find(s => s.id === id);
-      if (source) {
-        source.apiKey = key.trim();
-        renderSources();
-        updateStats();
-      }
-    }
-
-    function toggleShowApiKey(id) {
-      const input = document.getElementById(`apikey-${id}`);
-      input.type = input.type === 'password' ? 'text' : 'password';
-    }
-
-    async function testSource(id) {
-      const source = sources.find(s => s.id === id);
-      if (!source || !source.apiKey) return;
-
-      const btn = event.target;
-      const originalText = btn.textContent;
-      btn.textContent = '⏳';
-      btn.disabled = true;
-
-      try {
-        const headers = { 'Content-Type': 'application/json' };
-
-        if (source.provider === 'groq' || source.provider === 'openai') {
-          headers['Authorization'] = `Bearer ${source.apiKey}`;
-        } else if (source.provider === 'openrouter') {
-          headers['Authorization'] = `Bearer ${source.apiKey}`;
-          headers['HTTP-Referer'] = window.location.origin;
-        } else if (source.provider === 'huggingface') {
-          headers['Authorization'] = `Bearer ${source.apiKey}`;
-        }
-
-        const body = source.provider === 'huggingface' ? {
-          inputs: 'Say hello in one word',
-          parameters: { max_new_tokens: 10 }
-        } : {
-          model: source.model,
-          messages: [{ role: 'user', content: 'Say hello in one word' }],
-          max_tokens: 10
-        };
-
-        const response = await fetch(source.endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body)
-        });
-
-        if (response.ok) {
-          alert(`✅ Test Berhasil!\n\n${source.name} berfungsi dengan baik.`);
-        } else {
-          const error = await response.text();
-          alert(`❌ Test Gagal!\n\nStatus: ${response.status}\nError: ${error.substring(0, 200)}`);
-        }
-      } catch (error) {
-        alert(`❌ Test Gagal!\n\nError: ${error.message}`);
-      } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
-      }
-    }
-
-    function changePriority(id) {
-      const source = sources.find(s => s.id === id);
-      if (!source) return;
-
-      const newPriority = prompt(`Priority untuk ${source.name} (1-10, lower = higher):`, source.priority);
-      if (newPriority !== null) {
-        const p = parseInt(newPriority);
-        if (p >= 1 && p <= 10) {
-          source.priority = p;
-          sources.sort((a, b) => a.priority - b.priority);
-          renderSources();
-        }
-      }
-    }
-
-    function deleteSource(id) {
-      if (confirm('Hapus AI source ini?')) {
-        sources = sources.filter(s => s.id !== id);
-        renderSources();
-        updateStats();
-      }
-    }
-
-    function showAddForm() {
-      document.getElementById('addModal').classList.remove('hidden');
-    }
-
-    function closeAddForm() {
-      document.getElementById('addModal').classList.add('hidden');
-    }
-
-    function addCustomSource() {
-      const name = document.getElementById('customName').value.trim();
-      const provider = document.getElementById('customProvider').value;
-      const endpoint = document.getElementById('customEndpoint').value.trim();
-      const model = document.getElementById('customModel').value.trim();
-      const apiKey = document.getElementById('customApiKey').value.trim();
-      const priority = parseInt(document.getElementById('customPriority').value);
-
-      if (!name || !endpoint || !model) {
-        alert('Name, endpoint, dan model wajib diisi!');
-        return;
-      }
-
-      const newSource = {
-        id: 'custom-' + Date.now(),
-        name,
-        provider,
-        model,
-        endpoint,
-        apiKey,
-        priority,
-        enabled: true,
-        isDefault: false,
-        description: 'Custom AI source'
-      };
-
-      sources.push(newSource);
-      sources.sort((a, b) => a.priority - b.priority);
-      
-      renderSources();
-      updateStats();
-      closeAddForm();
-
-      document.getElementById('customName').value = '';
-      document.getElementById('customEndpoint').value = '';
-      document.getElementById('customModel').value = '';
-      document.getElementById('customApiKey').value = '';
-    }
-
-    async function saveAllConfig() {
-      await saveSources();
-      alert('✅ Konfigurasi berhasil disimpan!\n\nSemua AI sources tersimpan di server dan browser.\nPerubahan langsung aktif!');
-    }
-
-    function logout() {
-      if (confirm('Logout dari admin panel?')) {
-        localStorage.clear();
-        window.location.href = '/login.html';
-      }
-    }
-
-    // Auto-save every 30 seconds
-    setInterval(() => {
-      saveSources();
-    }, 30000);
-
-    // ==========================================
-    // COPY ENV TEMPLATE
-    // ==========================================
-    function copyEnvTemplate() {
-      const template = `# ==========================================
-# NextGenAI - Environment Variables
-# ==========================================
-
-# ==========================================
-# ADMIN AUTHENTICATION (REQUIRED)
-# ==========================================
-ADMIN_EMAILS=your-email@gmail.com
-ADMIN_PASSWORD=YourSecurePassword123!
-JWT_SECRET=your-very-long-random-secret-key-minimum-32-characters
-
-# ==========================================
-# AI PROVIDERS (Minimal 1 Required)
-# ==========================================
-
-# Groq (FREE) - https://console.groq.com
-GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# Google AI Studio (FREE) - https://makersuite.google.com/app/apikey
-GOOGLE_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# OpenRouter (PAID) - https://openrouter.ai/keys
-OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# ==========================================
-# MONGODB DATABASES (Optional - Multiple accounts)
-# ==========================================
-MONGODB_URI_1=mongodb+srv://user1:pass1@cluster1.xxxxx.mongodb.net/
-MONGODB_DB_1=nextgenai
-MONGODB_NAME_1=MongoDB Primary
-
-# ==========================================
-# SUPABASE DATABASES (Optional)
-# ==========================================
-SUPABASE_URL_1=https://xxxxx.supabase.co
-SUPABASE_KEY_1=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_NAME_1=Supabase Primary
-
-# ==========================================
-# VERCEL KV (Optional - Auto-configured)
-# ==========================================
-KV_REST_API_URL=https://xxxxx.kv.vercel-storage.com
-KV_REST_API_TOKEN=xxxxxxxxxxxxxxxxxxxxx
-
-# ==========================================
-# DEPLOYMENT
-# ==========================================
-VERCEL_URL=https://your-app.vercel.app
-NODE_ENV=production
-`;
-
-      navigator.clipboard.writeText(template).then(() => {
-        alert('✅ .env template copied to clipboard!\n\nPaste ini ke file .env Anda dan isi dengan credentials yang sebenarnya.');
-      }).catch(err => {
-        alert('❌ Failed to copy. Please copy manually from the .env.example file.');
-      });
-    }
-  </script>
-
-</body>
-</html>
+      </div>
+    `;
+  }
+}
+</script>
